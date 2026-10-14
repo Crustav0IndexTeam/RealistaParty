@@ -10,9 +10,16 @@
     font-family: "Courier New", monospace; color: #444; }
   body { position: fixed; inset: 0; }
 
-  #title { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; z-index: 20; }
-  #connect { font: bold 22px "Courier New", monospace; padding: 16px 44px; background: #b8b8b8; color: #222;
-    border: 3px solid #8e8e8e; border-radius: 4px; cursor: pointer; }
+  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; z-index: 20; gap: 14px; }
+  .menu-group { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .menu-group label { font-size: 13px; color: #777; font-weight: bold; }
+  #nameInput { font: 16px "Courier New", monospace; padding: 10px 14px; border: 2px solid #8e8e8e; border-radius: 4px; width: 220px; text-align: center; outline: none; }
+  .skin-select { display: flex; gap: 10px; }
+  .skin-btn { font: bold 13px "Courier New", monospace; padding: 8px 14px; background: #ddd; border: 2px solid #999; border-radius: 4px; cursor: pointer; }
+  .skin-btn.active { background: #888; color: #fff; border-color: #555; }
+
+  #connect { font: bold 20px "Courier New", monospace; padding: 14px 40px; background: #b8b8b8; color: #222;
+    border: 3px solid #8e8e8e; border-radius: 4px; cursor: pointer; margin-top: 10px; }
   #connect:hover { background: #c6c6c6; }
   #connect:disabled { background: #d8d8d8; color: #777; cursor: default; }
 
@@ -47,7 +54,21 @@
 </head>
 <body>
 
-<div id="title"><button id="connect">Connect</button></div>
+<div id="title">
+  <h1>REALISTA PARTY</h1>
+  <div class="menu-group">
+    <label>YOUR NAME</label>
+    <input id="nameInput" maxlength="12" placeholder="Enter name">
+  </div>
+  <div class="menu-group">
+    <label>SKIN</label>
+    <div class="skin-select">
+      <button class="skin-btn active" data-skin="guy">Guy</button>
+      <button class="skin-btn" data-skin="gunk">Gunk</button>
+    </div>
+  </div>
+  <button id="connect">Connect</button>
+</div>
 
 <div id="game">
   <canvas id="c"></canvas>
@@ -80,19 +101,34 @@
   const canvas = $("c"), ctx = canvas.getContext("2d");
   const chatInput = $("chatInput"), logEl = $("log"), actBtn = $("actBtn");
   $("hint").textContent = isTouch
-    ? "Move, jump, GRAB a box, GRAB again to throw, CHAT to talk"
-    : "A/D move   W jump   E grab / throw   Q drop   Y chat";
+    ? "Move, jump, GRAB box/player, DROP, CHAT"
+    : "A/D move   W jump   E grab/throw   Q drop   Y chat";
 
   // ---------- assets ----------
-  const sheet = new Image(), boxImg = new Image();
+  const sheets = {
+    guy: new Image(),
+    gunk: new Image()
+  };
+  const boxImg = new Image();
   let loaded = 0;
   const onLoad = () => { loaded++; };
-  sheet.onload = boxImg.onload = onLoad;
-  sheet.src = "sprites.png"; boxImg.src = "box.png";
+  sheets.guy.onload = sheets.gunk.onload = boxImg.onload = onLoad;
+  sheets.guy.src = "sprites.png";
+  sheets.gunk.src = "sprites.png"; // Fallback or distinct if available
+  boxImg.src = "box.png";
+
+  let selectedSkin = "guy";
+  document.querySelectorAll(".skin-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".skin-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedSkin = btn.dataset.skin;
+    });
+  });
 
   let ws = null, plats = [], playing = false;
-  const me = { id: 0, name: "", x: 480, y: 100, vx: 0, vy: 0, f: 1, g: false, anim: 0, hold: 0 };
-  const others = new Map();   // id -> {name,x,y,tx,ty,vx,f,g,ra,hold,anim}
+  const me = { id: 0, name: "Guy", skin: "guy", x: 480, y: 100, vx: 0, vy: 0, f: 1, g: false, anim: 0, hold: 0, carry: 0, carriedBy: 0, stun: 0 };
+  const others = new Map();   // id -> {name,skin,x,y,tx,ty,vx,f,g,ra,hold,carry,carriedBy,anim}
   const boxes = new Map();    // id -> {x,y,tx,ty,r,holder}
   const bubbles = new Map();  // id -> {lines, until}
   let reachT = 0, jumpBuf = 0, coyote = 0, chatOpen = false;
@@ -116,10 +152,15 @@
   const connectBtn = $("connect");
   connectBtn.addEventListener("click", () => {
     if (ws || loaded < 2) return;
+    const customName = $("nameInput").value.trim();
     connectBtn.disabled = true;
     connectBtn.textContent = "Connecting...";
     ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
     ws.onmessage = onMessage;
+    ws.onopen = () => {
+      if (customName) ws.send(JSON.stringify({ t: "n", n: customName }));
+      if (selectedSkin) ws.send(JSON.stringify({ t: "k", k: selectedSkin }));
+    };
     ws.onclose = ws.onerror = () => {
       if (!ws) return;
       ws = null; playing = false;
@@ -133,8 +174,13 @@
 
   function onMessage(ev) {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.t === "full") {
+      alert("Server is full!");
+      ws.close();
+      return;
+    }
     if (m.t === "w") {
-      me.id = m.id; me.name = m.name; me.x = m.x; me.y = m.y; me.vx = me.vy = 0; me.hold = 0;
+      me.id = m.id; me.name = m.name; me.x = m.x; me.y = m.y; me.vx = me.vy = 0; me.hold = 0; me.carry = 0; me.carriedBy = 0;
       plats = m.plats;
       others.clear(); boxes.clear(); bubbles.clear(); logEl.innerHTML = "";
       $("title").style.display = "none";
@@ -144,12 +190,16 @@
       last = performance.now();
     } else if (m.t === "s") {
       const seen = new Set();
-      for (const [id, name, x, y, vx, f, g, ra, hold] of m.p) {
-        if (id === me.id) { me.hold = hold; continue; }
+      for (const [id, name, x, y, vx, f, g, ra, hold, carry, skin] of m.p) {
+        if (id === me.id) {
+          me.hold = hold; me.carry = carry;
+          me.skin = skin || me.skin;
+          continue;
+        }
         seen.add(id);
         let o = others.get(id);
-        if (!o) { o = { name, x, y, tx: x, ty: y, vx, f, g, ra, hold, anim: 0 }; others.set(id, o); }
-        o.name = name; o.tx = x; o.ty = y; o.vx = vx; o.f = f; o.g = !!g; o.ra = !!ra; o.hold = hold;
+        if (!o) { o = { name, skin, x, y, tx: x, ty: y, vx, f, g, ra, hold, carry, carriedBy: 0, anim: 0 }; others.set(id, o); }
+        o.name = name; o.skin = skin || "guy"; o.tx = x; o.ty = y; o.vx = vx; o.f = f; o.g = !!g; o.ra = !!ra; o.hold = hold; o.carry = carry;
       }
       for (const id of [...others.keys()]) if (!seen.has(id)) { others.delete(id); bubbles.delete(id); }
       const seenB = new Set();
@@ -160,6 +210,14 @@
         b.tx = x; b.ty = y; b.tr = r; b.holder = holder;
       }
       for (const id of [...boxes.keys()]) if (!seenB.has(id)) boxes.delete(id);
+    } else if (m.t === "f") {
+      if (m.id === me.id) {
+        me.vx = m.vx; me.vy = m.vy; me.carriedBy = 0;
+        me.stun = performance.now() + 600;
+      } else {
+        const o = others.get(m.id);
+        if (o) { o.vx = m.vx; o.vy = m.vy; o.carriedBy = 0; }
+      }
     } else if (m.t === "c") {
       addLog(m.name, m.m);
       bubbles.set(m.id, { lines: wrap(m.m, 22), until: performance.now() + 5000 });
@@ -220,11 +278,18 @@
   function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
   function doAct() {
     if (!playing || chatOpen) return;
-    if (!me.hold) reachT = 0.25;
+    if (me.carriedBy) {
+      send({ t: "b" }); // wriggle if being carried
+      return;
+    }
+    if (!me.hold && !me.carry) reachT = 0.25;
     send({ t: "a" });
   }
   function doDrop() { if (playing && !chatOpen) send({ t: "d" }); }
-  function pressJump() { jumpBuf = 0.12; }
+  function pressJump() { 
+    if (me.carriedBy) { send({ t: "b" }); return; }
+    jumpBuf = 0.12; 
+  }
 
   const MAP = {
     KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right",
@@ -276,6 +341,7 @@
 
   const approach = (v, t, a) => (v < t ? Math.min(t, v + a) : Math.max(t, v - a));
   function stepMe(dt) {
+    if (me.carriedBy) return; // position controlled by carrier
     const left = keys.left || touch.left, right = keys.right || touch.right;
     const jumpHeld = keys.jump || touch.jump;
     const dir = (right ? 1 : 0) - (left ? 1 : 0);
@@ -301,16 +367,16 @@
       }
     }
     if (me.y < 0) { me.y = 0; me.vy = Math.max(me.vy, 0); }
-    if (me.y > 540) { me.y = 100; me.vy = 0; } // safety net
+    if (me.y > 800) { me.y = 200; me.vy = 0; } // safety net
     me.anim += dt;
     reachT = Math.max(0, reachT - dt);
   }
 
-  function drawGuy(x, y, f, g, vx, anim, holding, reach, reachElapsed) {
+  function drawGuy(x, y, f, g, vx, anim, holding, carrying, reach, reachElapsed, skin) {
     let row, col;
-    if (reach && !holding) { row = 2; col = reachElapsed < 0.1 ? 0 : 1; }
+    if (reach && !holding && !carrying) { row = 2; col = reachElapsed < 0.1 ? 0 : 1; }
     else {
-      row = holding ? 1 : 0;
+      row = (holding || carrying) ? 1 : 0;
       if (!g) col = 6;
       else if (Math.abs(vx) > 15) col = 2 + (Math.floor(anim * 10) % 4);
       else col = Math.floor(anim * 2.5) % 2;
@@ -318,7 +384,8 @@
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(f, 1);
-    ctx.drawImage(sheet, col * 32, row * 32, 32, 32, -32, -64, 64, 64);
+    const img = sheets[skin] || sheets.guy;
+    ctx.drawImage(img, col * 32, row * 32, 32, 32, -32, -64, 64, 64);
     ctx.restore();
   }
   function drawBox(x, y, r) {
@@ -357,7 +424,7 @@
     ctx.fillRect(0, 0, W, H);
 
     for (const p of plats) {
-      if (p.y >= 500) {
+      if (p.y >= 750) {
         ctx.fillStyle = "#ededed"; ctx.fillRect(p.x, p.y, p.w, H - p.y);
         ctx.fillStyle = "#b9b9b9"; ctx.fillRect(p.x, p.y, p.w, 3);
       } else {
@@ -366,7 +433,6 @@
       }
     }
 
-    // smooth others + boxes
     const a = 1 - Math.exp(-dt * 20);
     for (const o of others.values()) {
       if (Math.abs(o.tx - o.x) > 200 || Math.abs(o.ty - o.y) > 200) { o.x = o.tx; o.y = o.ty; }
@@ -386,11 +452,11 @@
     }
 
     for (const o of others.values()) {
-      drawGuy(o.x, o.y, o.f, o.g, o.vx, o.anim, !!o.hold, o.ra, 0.1);
+      drawGuy(o.x, o.y, o.f, o.g, o.vx, o.anim, !!o.hold, !!o.carry, o.ra, 0.1, o.skin);
       drawTag(o.x, o.y, o.name, false);
     }
     // me
-    drawGuy(me.x, me.y, me.f, me.g, me.vx, me.anim, !!me.hold, reachT > 0, 0.25 - reachT);
+    drawGuy(me.x, me.y, me.f, me.g, me.vx, me.anim, !!me.hold, !!me.carry, reachT > 0, 0.25 - reachT, me.skin);
     drawTag(me.x, me.y, me.name, true);
 
     // bubbles
@@ -417,7 +483,7 @@
              vx: Math.round(me.vx), f: me.f, g: me.g ? 1 : 0, ra: reachT > 0 ? 1 : 0 });
     }
     if (isTouch) {
-      const label = me.hold ? "THROW" : "GRAB";
+      const label = me.carriedBy ? "WRIGGLE" : (me.hold || me.carry ? "THROW" : "GRAB");
       if (label !== lastLabel) { actBtn.textContent = label; lastLabel = label; }
     }
     render(now, dt);
