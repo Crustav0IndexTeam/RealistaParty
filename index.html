@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Realista Partaayy</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; overscroll-behavior: none;
+    font-family: "Courier New", monospace; color: #444; }
+  body { position: fixed; inset: 0; }
+
+  #title { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff; z-index: 20; }
+  #connect { font: bold 22px "Courier New", monospace; padding: 16px 44px; background: #b8b8b8; color: #222;
+    border: 3px solid #8e8e8e; border-radius: 4px; cursor: pointer; }
+  #connect:hover { background: #c6c6c6; }
+  #connect:disabled { background: #d8d8d8; color: #777; cursor: default; }
+
+  #game { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; }
+  canvas { background: #fff; image-rendering: pixelated; touch-action: none; }
+  #hint { position: fixed; top: 8px; left: 10px; font-size: 13px; color: #888; pointer-events: none; z-index: 5; }
+  #portrait { position: fixed; top: 30px; left: 10px; font-size: 13px; color: #c55; display: none; pointer-events: none; z-index: 5; }
+
+  #log { position: fixed; left: 10px; bottom: 10px; width: min(420px, 60vw); display: flex; flex-direction: column;
+    gap: 2px; font-size: 14px; pointer-events: none; z-index: 6; }
+  #log div { background: rgba(255,255,255,.85); padding: 1px 6px; border-radius: 3px; transition: opacity 1s; word-break: break-word; }
+  #log b { color: #777; }
+  body.touch #log { bottom: auto; top: 54px; }
+
+  #chatInput { position: fixed; left: 10px; bottom: 10px; width: min(420px, calc(100vw - 20px)); display: none; z-index: 12;
+    font: 16px "Courier New", monospace; padding: 8px 10px; border: 2px solid #8e8e8e; border-radius: 4px; background: #fff; color: #222; outline: none; }
+  body.touch #chatInput { bottom: auto; top: 10px; left: 10px; width: calc(100vw - 110px); }
+
+  #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 8; }
+  body.touch #touch { display: block; }
+  #touch button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
+    font: bold 18px "Courier New", monospace; color: #333; background: rgba(150,150,150,.45);
+    border: 2px solid rgba(90,90,90,.6); border-radius: 14px; width: 74px; height: 74px; }
+  #touch button.down { background: rgba(110,110,110,.7); }
+  #touch .pad { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
+  #touch .padL { left: calc(14px + env(safe-area-inset-left)); }
+  #touch .padR { right: calc(14px + env(safe-area-inset-right)); }
+  #touch button.small { width: 56px; height: 56px; font-size: 13px; }
+  #touch button.wide { width: 92px; }
+  #chatBtn { position: absolute; top: 10px; right: calc(10px + env(safe-area-inset-right)); width: 84px !important; height: 44px !important; font-size: 15px !important; }
+</style>
+</head>
+<body>
+
+<div id="title"><button id="connect">Connect</button></div>
+
+<div id="game">
+  <canvas id="c"></canvas>
+  <div id="hint"></div>
+  <div id="portrait">Turn your phone sideways for a bigger view</div>
+  <div id="log"></div>
+  <input id="chatInput" maxlength="100" autocomplete="off" autocapitalize="off" enterkeyhint="send" placeholder="Type and press Enter">
+  <div id="touch">
+    <div class="pad padL">
+      <button data-k="left">&lt;</button>
+      <button data-k="right">&gt;</button>
+    </div>
+    <div class="pad padR">
+      <button data-k="drop" class="small">DROP</button>
+      <button data-k="act" class="wide" id="actBtn">GRAB</button>
+      <button data-k="jump">JUMP</button>
+    </div>
+    <button id="chatBtn">CHAT</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const W = 960, H = 540;
+  const GRAV = 1800, SPEED = 260, JUMP = 700;
+  const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  if (isTouch) document.body.classList.add("touch");
+
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("c"), ctx = canvas.getContext("2d");
+  const chatInput = $("chatInput"), logEl = $("log"), actBtn = $("actBtn");
+  $("hint").textContent = isTouch
+    ? "Move, jump, GRAB a box, GRAB again to throw, CHAT to talk"
+    : "A/D move   W jump   E grab / throw   Q drop   Y chat";
+
+  // ---------- assets ----------
+  const sheet = new Image(), boxImg = new Image();
+  let loaded = 0;
+  const onLoad = () => { loaded++; };
+  sheet.onload = boxImg.onload = onLoad;
+  sheet.src = "sprites.png"; boxImg.src = "box.png";
+
+  let ws = null, plats = [], playing = false;
+  const me = { id: 0, name: "", x: 480, y: 100, vx: 0, vy: 0, f: 1, g: false, anim: 0, hold: 0 };
+  const others = new Map();   // id -> {name,x,y,tx,ty,vx,f,g,ra,hold,anim}
+  const boxes = new Map();    // id -> {x,y,tx,ty,r,holder}
+  const bubbles = new Map();  // id -> {lines, until}
+  let reachT = 0, jumpBuf = 0, coyote = 0, chatOpen = false;
+  const keys = { left: false, right: false, jump: false };
+  const touch = { left: false, right: false, jump: false };
+
+  let K = 1;
+  function resize() {
+    const s = Math.min(innerWidth / W, innerHeight / H);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.style.width = Math.floor(W * s) + "px";
+    canvas.style.height = Math.floor(H * s) + "px";
+    canvas.width = Math.round(W * s * dpr);
+    canvas.height = Math.round(H * s * dpr);
+    K = canvas.width / W;
+    $("portrait").style.display = (isTouch && innerHeight > innerWidth) ? "block" : "none";
+  }
+  addEventListener("resize", resize);
+  addEventListener("orientationchange", () => setTimeout(resize, 200));
+
+  const connectBtn = $("connect");
+  connectBtn.addEventListener("click", () => {
+    if (ws || loaded < 2) return;
+    connectBtn.disabled = true;
+    connectBtn.textContent = "Connecting...";
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
+    ws.onmessage = onMessage;
+    ws.onclose = ws.onerror = () => {
+      if (!ws) return;
+      ws = null; playing = false;
+      closeChat();
+      $("game").style.display = "none";
+      $("title").style.display = "flex";
+      connectBtn.disabled = false;
+      connectBtn.textContent = "Connect";
+    };
+  });
+
+  function onMessage(ev) {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    if (m.t === "w") {
+      me.id = m.id; me.name = m.name; me.x = m.x; me.y = m.y; me.vx = me.vy = 0; me.hold = 0;
+      plats = m.plats;
+      others.clear(); boxes.clear(); bubbles.clear(); logEl.innerHTML = "";
+      $("title").style.display = "none";
+      $("game").style.display = "flex";
+      playing = true;
+      resize();
+      last = performance.now();
+    } else if (m.t === "s") {
+      const seen = new Set();
+      for (const [id, name, x, y, vx, f, g, ra, hold] of m.p) {
+        if (id === me.id) { me.hold = hold; continue; }
+        seen.add(id);
+        let o = others.get(id);
+        if (!o) { o = { name, x, y, tx: x, ty: y, vx, f, g, ra, hold, anim: 0 }; others.set(id, o); }
+        o.name = name; o.tx = x; o.ty = y; o.vx = vx; o.f = f; o.g = !!g; o.ra = !!ra; o.hold = hold;
+      }
+      for (const id of [...others.keys()]) if (!seen.has(id)) { others.delete(id); bubbles.delete(id); }
+      const seenB = new Set();
+      for (const [id, x, y, r, holder] of m.b) {
+        seenB.add(id);
+        let b = boxes.get(id);
+        if (!b) { b = { x, y, tx: x, ty: y, r, tr: r, holder }; boxes.set(id, b); }
+        b.tx = x; b.ty = y; b.tr = r; b.holder = holder;
+      }
+      for (const id of [...boxes.keys()]) if (!seenB.has(id)) boxes.delete(id);
+    } else if (m.t === "c") {
+      addLog(m.name, m.m);
+      bubbles.set(m.id, { lines: wrap(m.m, 22), until: performance.now() + 5000 });
+    }
+  }
+
+  function addLog(name, text) {
+    const d = document.createElement("div");
+    const b = document.createElement("b");
+    b.textContent = name + ": ";
+    d.appendChild(b);
+    d.appendChild(document.createTextNode(text));
+    logEl.appendChild(d);
+    while (logEl.children.length > 6) logEl.removeChild(logEl.firstChild);
+    d._t1 = setTimeout(() => { if (!chatOpen) d.style.opacity = 0; }, 12000);
+    d._t2 = setTimeout(() => d.remove(), 14000);
+  }
+  function openChat() {
+    if (chatOpen || !playing) return;
+    chatOpen = true;
+    keys.left = keys.right = keys.jump = false;
+    touch.left = touch.right = touch.jump = false;
+    for (const d of logEl.children) d.style.opacity = 1;
+    chatInput.value = "";
+    chatInput.style.display = "block";
+    chatInput.focus();
+  }
+  function closeChat() {
+    if (!chatOpen) return;
+    chatOpen = false;
+    chatInput.style.display = "none";
+    chatInput.blur();
+  }
+  chatInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const text = chatInput.value.trim();
+      if (text && ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "c", m: text }));
+      closeChat();
+      e.preventDefault();
+    } else if (e.key === "Escape") {
+      closeChat();
+    }
+    e.stopPropagation();
+  });
+  chatInput.addEventListener("blur", () => setTimeout(closeChat, 120));
+  $("chatBtn").addEventListener("click", (e) => { e.preventDefault(); openChat(); });
+
+  function wrap(text, n) {
+    const words = text.split(/\s+/), lines = []; let cur = "";
+    for (let w of words) {
+      while (w.length > n) { if (cur) { lines.push(cur); cur = ""; } lines.push(w.slice(0, n)); w = w.slice(n); }
+      if ((cur + " " + w).trim().length > n) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim();
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+
+  function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+  function doAct() {
+    if (!playing || chatOpen) return;
+    if (!me.hold) reachT = 0.25;
+    send({ t: "a" });
+  }
+  function doDrop() { if (playing && !chatOpen) send({ t: "d" }); }
+  function pressJump() { jumpBuf = 0.12; }
+
+  const MAP = {
+    KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right",
+    KeyW: "jump", ArrowUp: "jump", Space: "jump",
+  };
+  addEventListener("keydown", (e) => {
+    if (!playing || document.activeElement === chatInput) return;
+    if (e.code === "KeyY") { e.preventDefault(); openChat(); return; }
+    const k = MAP[e.code];
+    if (k) {
+      e.preventDefault();
+      if (k === "jump" && !keys.jump) pressJump();
+      keys[k] = true;
+    } else if (e.code === "KeyE" || e.code === "KeyF") {
+      e.preventDefault();
+      if (!e.repeat) doAct();
+    } else if (e.code === "KeyQ") {
+      if (!e.repeat) doDrop();
+    }
+  });
+  addEventListener("keyup", (e) => {
+    const k = MAP[e.code];
+    if (k) keys[k] = false;
+  });
+  addEventListener("blur", () => { keys.left = keys.right = keys.jump = false; });
+
+  document.querySelectorAll("#touch button[data-k]").forEach((btn) => {
+    const k = btn.dataset.k;
+    const down = (e) => {
+      e.preventDefault();
+      btn.classList.add("down");
+      try { btn.setPointerCapture(e.pointerId); } catch {}
+      if (k === "act") doAct();
+      else if (k === "drop") doDrop();
+      else { if (k === "jump" && !touch.jump) pressJump(); touch[k] = true; }
+    };
+    const up = (e) => {
+      e.preventDefault();
+      btn.classList.remove("down");
+      if (k in touch) touch[k] = false;
+    };
+    btn.addEventListener("pointerdown", down);
+    btn.addEventListener("pointerup", up);
+    btn.addEventListener("pointercancel", up);
+    btn.addEventListener("lostpointercapture", up);
+  });
+  document.addEventListener("contextmenu", (e) => e.preventDefault());
+  document.addEventListener("touchmove", (e) => { if (e.target !== chatInput) e.preventDefault(); }, { passive: false });
+
+  const approach = (v, t, a) => (v < t ? Math.min(t, v + a) : Math.max(t, v - a));
+  function stepMe(dt) {
+    const left = keys.left || touch.left, right = keys.right || touch.right;
+    const jumpHeld = keys.jump || touch.jump;
+    const dir = (right ? 1 : 0) - (left ? 1 : 0);
+    if (dir) me.f = dir;
+    me.vx = approach(me.vx, dir * SPEED, (dir ? (me.g ? 3000 : 2000) : (me.g ? 3200 : 500)) * dt);
+
+    jumpBuf = Math.max(0, jumpBuf - dt);
+    coyote = me.g ? 0.1 : Math.max(0, coyote - dt);
+    if (jumpBuf > 0 && coyote > 0) { me.vy = -JUMP; jumpBuf = 0; coyote = 0; me.g = false; }
+    if (!jumpHeld && me.vy < -250) me.vy = -250;
+
+    me.x += me.vx * dt;
+    if (me.x < 16) { me.x = 16; me.vx = 0; }
+    if (me.x > W - 16) { me.x = W - 16; me.vx = 0; }
+
+    const prevY = me.y;
+    me.vy += GRAV * dt;
+    me.y += me.vy * dt;
+    me.g = false;
+    for (const p of plats) {
+      if (me.vy >= 0 && prevY <= p.y + 0.5 && me.y >= p.y && me.x + 13 > p.x && me.x - 13 < p.x + p.w) {
+        me.y = p.y; me.vy = 0; me.g = true;
+      }
+    }
+    if (me.y < 0) { me.y = 0; me.vy = Math.max(me.vy, 0); }
+    if (me.y > 540) { me.y = 100; me.vy = 0; } // safety net
+    me.anim += dt;
+    reachT = Math.max(0, reachT - dt);
+  }
+
+  function drawGuy(x, y, f, g, vx, anim, holding, reach, reachElapsed) {
+    let row, col;
+    if (reach && !holding) { row = 2; col = reachElapsed < 0.1 ? 0 : 1; }
+    else {
+      row = holding ? 1 : 0;
+      if (!g) col = 6;
+      else if (Math.abs(vx) > 15) col = 2 + (Math.floor(anim * 10) % 4);
+      else col = Math.floor(anim * 2.5) % 2;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(f, 1);
+    ctx.drawImage(sheet, col * 32, row * 32, 32, 32, -32, -64, 64, 64);
+    ctx.restore();
+  }
+  function drawBox(x, y, r) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(r);
+    ctx.drawImage(boxImg, -16, -16, 32, 32);
+    ctx.restore();
+  }
+  function drawTag(x, y, name, mine) {
+    ctx.font = (mine ? "bold " : "") + "12px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    ctx.fillStyle = mine ? "#333" : "#999";
+    ctx.fillText(name, x, y - 64);
+  }
+  function drawBubble(x, y, b) {
+    ctx.font = "bold 13px 'Courier New', monospace";
+    ctx.textAlign = "center";
+    const lh = 16;
+    let w = 0;
+    for (const l of b.lines) w = Math.max(w, ctx.measureText(l).width);
+    w += 14;
+    const h = b.lines.length * lh + 8;
+    let bx = Math.max(4, Math.min(W - w - 4, x - w / 2));
+    const by = y - 76 - h;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#999"; ctx.lineWidth = 2;
+    ctx.fillRect(bx, by, w, h); ctx.strokeRect(bx, by, w, h);
+    ctx.fillStyle = "#222";
+    b.lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 16 + i * lh - 2));
+  }
+
+  function render(now, dt) {
+    ctx.setTransform(K, 0, 0, K, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, W, H);
+
+    for (const p of plats) {
+      if (p.y >= 500) {
+        ctx.fillStyle = "#ededed"; ctx.fillRect(p.x, p.y, p.w, H - p.y);
+        ctx.fillStyle = "#b9b9b9"; ctx.fillRect(p.x, p.y, p.w, 3);
+      } else {
+        ctx.fillStyle = "#dadada"; ctx.fillRect(p.x, p.y, p.w, 10);
+        ctx.fillStyle = "#b0b0b0"; ctx.fillRect(p.x, p.y, p.w, 3);
+      }
+    }
+
+    // smooth others + boxes
+    const a = 1 - Math.exp(-dt * 20);
+    for (const o of others.values()) {
+      if (Math.abs(o.tx - o.x) > 200 || Math.abs(o.ty - o.y) > 200) { o.x = o.tx; o.y = o.ty; }
+      o.x += (o.tx - o.x) * a; o.y += (o.ty - o.y) * a;
+      o.anim += dt;
+    }
+    for (const b of boxes.values()) {
+      if (Math.abs(b.tx - b.x) > 150 || Math.abs(b.ty - b.y) > 150) { b.x = b.tx; b.y = b.ty; }
+      b.x += (b.tx - b.x) * a; b.y += (b.ty - b.y) * a; b.r += (b.tr - b.r) * a;
+    }
+
+    for (const [id, b] of boxes) {
+      let x = b.x, y = b.y;
+      if (b.holder === me.id) { x = me.x + me.f * 36; y = me.y - 32; }
+      else if (b.holder && others.has(b.holder)) { const o = others.get(b.holder); x = o.x + o.f * 36; y = o.y - 32; }
+      drawBox(x, y, b.r);
+    }
+
+    for (const o of others.values()) {
+      drawGuy(o.x, o.y, o.f, o.g, o.vx, o.anim, !!o.hold, o.ra, 0.1);
+      drawTag(o.x, o.y, o.name, false);
+    }
+    // me
+    drawGuy(me.x, me.y, me.f, me.g, me.vx, me.anim, !!me.hold, reachT > 0, 0.25 - reachT);
+    drawTag(me.x, me.y, me.name, true);
+
+    // bubbles
+    for (const [id, b] of bubbles) {
+      if (now > b.until) { bubbles.delete(id); continue; }
+      const o = id === me.id ? me : others.get(id);
+      if (o) drawBubble(o.x, o.y, b);
+    }
+  }
+
+  // ---------- main loop ----------
+  let last = performance.now(), acc = 0, lastSend = 0, lastLabel = "";
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!playing) return;
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    acc += dt;
+    while (acc >= 1 / 60) { stepMe(1 / 60); acc -= 1 / 60; }
+
+    if (now - lastSend > 50) {
+      lastSend = now;
+      send({ t: "p", x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10,
+             vx: Math.round(me.vx), f: me.f, g: me.g ? 1 : 0, ra: reachT > 0 ? 1 : 0 });
+    }
+    if (isTouch) {
+      const label = me.hold ? "THROW" : "GRAB";
+      if (label !== lastLabel) { actBtn.textContent = label; lastLabel = label; }
+    }
+    render(now, dt);
+  }
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
