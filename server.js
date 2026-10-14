@@ -1,4 +1,4 @@
-// Realista Party - tiny multiplayer server (Node + ws, no other dependencies)
+// Pixel Box Party - tiny multiplayer server (Node + ws, no other dependencies)
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -11,28 +11,20 @@ const PUBLIC = path.join(__dirname, "public");
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".png": "image/png",
-  ".mp3": "audio/mpeg",
   ".js": "text/javascript",
   ".css": "text/css",
-  ".json": "application/json",
   ".ico": "image/x-icon",
 };
 
 const server = http.createServer((req, res) => {
-  let urlPath = "/";
-  try {
-    urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
-  } catch {
-    res.writeHead(400);
-    return res.end("Bad request");
-  }
+  const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
   if (urlPath === "/healthz") {
     res.writeHead(200, { "Content-Type": "text/plain" });
     return res.end("ok");
   }
   const rel = urlPath === "/" ? "index.html" : urlPath;
   const file = path.normalize(path.join(PUBLIC, rel));
-  if (file !== PUBLIC && !file.startsWith(PUBLIC + path.sep)) {
+  if (!file.startsWith(PUBLIC)) {
     res.writeHead(403);
     return res.end("Forbidden");
   }
@@ -41,49 +33,27 @@ const server = http.createServer((req, res) => {
       res.writeHead(404);
       return res.end("Not found");
     }
-    const ext = path.extname(file);
     res.writeHead(200, {
-      "Content-Type": MIME[ext] || "application/octet-stream",
-      "Cache-Control": ext === ".html" ? "no-cache" : "public, max-age=300",
+      "Content-Type": MIME[path.extname(file)] || "application/octet-stream",
+      "Cache-Control": "no-cache",
     });
     res.end(data);
   });
 });
 
 // ---------- world ----------
-const W = 3200;
-const H = 800;
-const FLOOR = 760;
+const W = 960;
+const H = 540;
 const PLATS = [
-  { x: 0, y: FLOOR, w: W }, // floor (must stay first)
-  { x: 20, y: 550, w: 160 },
-  { x: 200, y: 650, w: 220 },
-  { x: 480, y: 560, w: 200 },
-  { x: 220, y: 470, w: 200 },
-  { x: 560, y: 380, w: 220 },
-  { x: 760, y: 650, w: 260 },
-  { x: 900, y: 380, w: 260 },
-  { x: 1100, y: 650, w: 200 },
-  { x: 1380, y: 560, w: 240 },
-  { x: 1120, y: 470, w: 200 },
-  { x: 1400, y: 370, w: 240 },
-  { x: 1720, y: 280, w: 220 },
-  { x: 1700, y: 650, w: 300 },
-  { x: 2060, y: 560, w: 200 },
-  { x: 2320, y: 470, w: 220 },
-  { x: 2000, y: 380, w: 200 },
-  { x: 2620, y: 650, w: 260 },
-  { x: 2900, y: 560, w: 240 },
-  { x: 2660, y: 470, w: 200 },
+  { x: 0, y: 500, w: 960 }, // floor
+  { x: 130, y: 390, w: 220 },
+  { x: 610, y: 390, w: 220 },
+  { x: 370, y: 280, w: 220 },
 ];
 const GRAV = 1800;
-const BOX = 32;
+const BOX = 32; // box size in world units
 const HALF = BOX / 2;
 const MAX_PLAYERS = 24;
-const SKINS = ["guy", "gunk"];
-const FLING_SPEED = 450; // box speed needed to fling someone
-const CARRY_DX = 26; // where a carried player hangs relative to the carrier
-const CARRY_DY = 20;
 
 const players = new Map();
 const boxes = new Map();
@@ -92,18 +62,6 @@ let nextBoxId = 1;
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const num = (v, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
-const cleanName = (s) =>
-  String(s || "")
-    .replace(/[^\x20-\x7e]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 12);
-const cleanChat = (s) =>
-  String(s || "")
-    .replace(/[^\x20-\x7e]/g, "?")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 100);
 
 function spawnBox(near) {
   const side = Math.random() < 0.5 ? -1 : 1;
@@ -117,8 +75,6 @@ function spawnBox(near) {
     holder: 0,
     owner: near.id,
     sup: false,
-    thrower: 0,
-    thrownAt: 0,
   };
   boxes.set(b.id, b);
   return b;
@@ -134,33 +90,6 @@ function broadcast(obj) {
   const s = JSON.stringify(obj);
   for (const p of players.values()) if (p.ws.readyState === 1) p.ws.send(s);
 }
-function sendFling(q, vx, vy, k) {
-  // k: 1 = flung (scream + spin), 0 = just released
-  q.g = false;
-  broadcast({ t: "f", id: q.id, vx: Math.round(vx), vy: Math.round(vy), k });
-}
-
-// let go of whatever p is holding (box or person)
-function releaseAll(p) {
-  if (p.hold) {
-    const b = boxes.get(p.hold);
-    p.hold = 0;
-    if (b) {
-      b.holder = 0;
-      b.vx = 0;
-      b.vy = 0;
-    }
-  }
-  if (p.carry) {
-    const q = players.get(p.carry);
-    p.carry = 0;
-    if (q) {
-      q.carriedBy = 0;
-      q.struggle = 0;
-      sendFling(q, 0, 0, 0);
-    }
-  }
-}
 
 wss.on("connection", (ws) => {
   if (players.size >= MAX_PLAYERS) {
@@ -172,22 +101,15 @@ wss.on("connection", (ws) => {
     id,
     ws,
     name: "Guy" + String(Math.floor(Math.random() * 900) + 100),
-    skin: "guy",
-    x: 1300 + Math.random() * 600,
-    y: 200,
+    x: 100 + Math.random() * (W - 200),
+    y: 100,
     vx: 0,
     f: 1,
     g: false,
     ra: false,
     hold: 0,
-    carry: 0,
-    carriedBy: 0,
-    struggle: 0,
-    flingUntil: 0,
     lastChat: 0,
     lastAct: 0,
-    lastMisc: 0,
-    lastStruggle: 0,
   };
   players.set(id, p);
   spawnBox(p); // every player gets at least one box
@@ -204,41 +126,29 @@ wss.on("connection", (ws) => {
       return;
     }
     if (!m || typeof m !== "object") return;
-    const now = Date.now();
 
     if (m.t === "p") {
-      if (p.carriedBy) return; // position is controlled by the carrier
       p.x = clamp(num(m.x, p.x), 16, W - 16);
-      p.y = clamp(num(m.y, p.y), 0, FLOOR);
-      p.vx = clamp(num(m.vx), -1500, 1500);
+      p.y = clamp(num(m.y, p.y), 0, 500);
+      p.vx = clamp(num(m.vx), -400, 400);
       p.f = m.f === -1 ? -1 : 1;
       p.g = !!m.g;
       p.ra = !!m.ra;
     } else if (m.t === "a") {
-      if (p.carriedBy || now - p.lastAct < 150) return;
+      const now = Date.now();
+      if (now - p.lastAct < 150) return;
       p.lastAct = now;
       if (p.hold) {
-        // throw box
+        // throw
         const b = boxes.get(p.hold);
         p.hold = 0;
         if (b) {
           b.holder = 0;
           b.vx = p.f * 620 + p.vx * 0.4;
           b.vy = -340;
-          b.thrower = p.id;
-          b.thrownAt = now;
-        }
-      } else if (p.carry) {
-        // throw person
-        const q = players.get(p.carry);
-        p.carry = 0;
-        if (q) {
-          q.carriedBy = 0;
-          q.struggle = 0;
-          sendFling(q, p.f * 620 + p.vx * 0.4, -340, 1);
         }
       } else {
-        // grab nearest free box, otherwise nearest free person
+        // grab nearest free box in reach
         let best = null;
         let bd = 80;
         for (const b of boxes.values()) {
@@ -251,28 +161,10 @@ wss.on("connection", (ws) => {
         }
         if (best) {
           best.holder = p.id;
-          best.thrower = 0;
           p.hold = best.id;
-        } else {
-          let who = null;
-          let wd = 70;
-          for (const q of players.values()) {
-            if (q === p || q.carriedBy || q.carry || q.hold) continue;
-            const d = Math.hypot(q.x - p.x, q.y - p.y);
-            if (d < wd) {
-              wd = d;
-              who = q;
-            }
-          }
-          if (who) {
-            p.carry = who.id;
-            who.carriedBy = p.id;
-            who.struggle = 0;
-          }
         }
       }
     } else if (m.t === "d") {
-      if (p.carriedBy) return;
       if (p.hold) {
         const b = boxes.get(p.hold);
         p.hold = 0;
@@ -281,57 +173,23 @@ wss.on("connection", (ws) => {
           b.vx = p.vx * 0.4;
           b.vy = 0;
         }
-      } else if (p.carry) {
-        const q = players.get(p.carry);
-        p.carry = 0;
-        if (q) {
-          q.carriedBy = 0;
-          q.struggle = 0;
-          sendFling(q, p.vx * 0.4, 0, 0);
-        }
-      }
-    } else if (m.t === "b") {
-      // carried player wriggling
-      if (!p.carriedBy || now - p.lastStruggle < 100) return;
-      p.lastStruggle = now;
-      if (++p.struggle >= 5) {
-        const c = players.get(p.carriedBy);
-        p.carriedBy = 0;
-        p.struggle = 0;
-        if (c) {
-          c.carry = 0;
-          sendFling(p, -c.f * 220, -460, 0);
-        }
       }
     } else if (m.t === "c") {
+      const now = Date.now();
       if (now - p.lastChat < 500) return;
-      const text = cleanChat(m.m);
+      let text = String(m.m || "")
+        .replace(/[\u0000-\u001f\u007f]/g, "")
+        .trim()
+        .slice(0, 100);
       if (!text) return;
       p.lastChat = now;
       broadcast({ t: "c", id: p.id, name: p.name, m: text });
-    } else if (m.t === "n") {
-      if (now - p.lastMisc < 300) return;
-      const n = cleanName(m.n);
-      if (n) {
-        p.lastMisc = now;
-        p.name = n;
-      }
-    } else if (m.t === "k") {
-      if (now - p.lastMisc < 300) return;
-      if (SKINS.includes(m.k)) {
-        p.lastMisc = now;
-        p.skin = m.k;
-      }
     }
   });
 
   ws.on("close", () => {
-    releaseAll(p);
-    if (p.carriedBy) {
-      const c = players.get(p.carriedBy);
-      if (c) c.carry = 0;
-    }
     players.delete(id);
+    // remove this player's boxes; free anyone holding them
     for (const b of [...boxes.values()]) {
       if (b.owner === id) {
         boxes.delete(b.id);
@@ -363,35 +221,7 @@ function settleRot(b, dt) {
   b.r += (target - b.r) * Math.min(1, 14 * dt);
 }
 
-function hitPlayer(p, b, now) {
-  const bvx = b.vx;
-  let vx = clamp(bvx * 0.9, -900, 900);
-  if (Math.abs(bvx) < 150) vx = (Math.sign(p.x - b.x) || 1) * 260;
-  releaseAll(p);
-  p.flingUntil = now + 1200;
-  sendFling(p, vx, -420, 1);
-  b.vx *= 0.35;
-  b.vy *= 0.3;
-}
-
 function step(dt) {
-  const now = Date.now();
-
-  // carried players hang off their carrier
-  for (const p of players.values()) {
-    if (!p.carry) continue;
-    const q = players.get(p.carry);
-    if (!q) {
-      p.carry = 0;
-      continue;
-    }
-    q.x = p.x + p.f * CARRY_DX;
-    q.y = p.y - CARRY_DY;
-    q.vx = 0;
-    q.f = p.f;
-    q.g = false;
-  }
-
   const free = [];
   for (const b of boxes.values()) {
     if (b.holder) {
@@ -442,28 +272,14 @@ function step(dt) {
     }
   }
 
-  // fast boxes fling people
-  for (const b of free) {
-    if (Math.hypot(b.vx, b.vy) < FLING_SPEED) continue;
-    for (const p of players.values()) {
-      if (p.carriedBy || p.flingUntil > now) continue;
-      if (b.thrower === p.id && now - b.thrownAt < 500) continue;
-      if (Math.abs(b.x - p.x) < 13 + HALF && Math.abs(b.y - (p.y - 29)) < 29 + HALF) {
-        hitPlayer(p, b, now);
-        break;
-      }
-    }
-  }
-
-  // players shove slow boxes by walking into them
+  // players shove boxes by walking into them
   for (const p of players.values()) {
-    if (Math.abs(p.vx) < 20 || p.carriedBy) continue;
+    if (Math.abs(p.vx) < 20) continue;
     const dir = Math.sign(p.vx);
     for (const b of free) {
-      if (Math.hypot(b.vx, b.vy) > 300) continue;
       if (Math.abs(b.x - p.x) < 13 + HALF && Math.abs(b.y - (p.y - 29)) < 29 + HALF && Math.sign(b.x - p.x) === dir) {
         b.vx = p.vx * 1.15;
-        b.x = clamp(p.x + dir * (13 + HALF), HALF, W - HALF);
+        b.x = p.x + dir * (13 + HALF);
       }
     }
   }
@@ -528,8 +344,6 @@ setInterval(() => {
         p.g ? 1 : 0,
         p.ra ? 1 : 0,
         p.hold,
-        p.carry,
-        p.skin,
       ]),
       b: [...boxes.values()].map((b) => [
         b.id,
@@ -542,4 +356,4 @@ setInterval(() => {
   }
 }, 1000 / 60);
 
-server.listen(PORT, () => console.log("Realista Party running on port " + PORT));
+server.listen(PORT, () => console.log("Pixel Box Party running on port " + PORT));
