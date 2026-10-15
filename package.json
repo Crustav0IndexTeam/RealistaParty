@@ -1,7 +1,7 @@
 {
-  "name": "Realista Party",
+  "name": "pixel-box-party",
   "version": "1.0.0",
-  "description": "wooo",
+  "description": "Tiny multiplayer box-throwing game with chat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

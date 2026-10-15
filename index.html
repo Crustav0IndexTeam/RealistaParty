@@ -3,490 +3,1048 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Realista Partaayy</title>
+<title>Realista Party</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; overscroll-behavior: none;
-    font-family: "Courier New", monospace; color: #444; }
+  html, body { margin: 0; height: 100%; background: #d6d6d6; overflow: hidden; overscroll-behavior: none; }
   body { position: fixed; inset: 0; }
-
-  #title { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fff; z-index: 20; gap: 14px; }
-  .menu-group { display: flex; flex-direction: column; gap: 6px; align-items: center; }
-  .menu-group label { font-size: 13px; color: #777; font-weight: bold; }
-  #nameInput { font: 16px "Courier New", monospace; padding: 10px 14px; border: 2px solid #8e8e8e; border-radius: 4px; width: 220px; text-align: center; outline: none; }
-  .skin-select { display: flex; gap: 10px; }
-  .skin-btn { font: bold 13px "Courier New", monospace; padding: 8px 14px; background: #ddd; border: 2px solid #999; border-radius: 4px; cursor: pointer; }
-  .skin-btn.active { background: #888; color: #fff; border-color: #555; }
-
-  #connect { font: bold 20px "Courier New", monospace; padding: 14px 40px; background: #b8b8b8; color: #222;
-    border: 3px solid #8e8e8e; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-  #connect:hover { background: #c6c6c6; }
-  #connect:disabled { background: #d8d8d8; color: #777; cursor: default; }
-
-  #game { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; }
-  canvas { background: #fff; image-rendering: pixelated; touch-action: none; }
-  #hint { position: fixed; top: 8px; left: 10px; font-size: 13px; color: #888; pointer-events: none; z-index: 5; }
-  #portrait { position: fixed; top: 30px; left: 10px; font-size: 13px; color: #c55; display: none; pointer-events: none; z-index: 5; }
-
-  #log { position: fixed; left: 10px; bottom: 10px; width: min(420px, 60vw); display: flex; flex-direction: column;
-    gap: 2px; font-size: 14px; pointer-events: none; z-index: 6; }
-  #log div { background: rgba(255,255,255,.85); padding: 1px 6px; border-radius: 3px; transition: opacity 1s; word-break: break-word; }
-  #log b { color: #777; }
-  body.touch #log { bottom: auto; top: 54px; }
-
-  #chatInput { position: fixed; left: 10px; bottom: 10px; width: min(420px, calc(100vw - 20px)); display: none; z-index: 12;
-    font: 16px "Courier New", monospace; padding: 8px 10px; border: 2px solid #8e8e8e; border-radius: 4px; background: #fff; color: #222; outline: none; }
-  body.touch #chatInput { bottom: auto; top: 10px; left: 10px; width: calc(100vw - 110px); }
-
-  #touch { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 8; }
-  body.touch #touch { display: block; }
-  #touch button { pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none;
-    font: bold 18px "Courier New", monospace; color: #333; background: rgba(150,150,150,.45);
-    border: 2px solid rgba(90,90,90,.6); border-radius: 14px; width: 74px; height: 74px; }
-  #touch button.down { background: rgba(110,110,110,.7); }
-  #touch .pad { position: absolute; bottom: calc(14px + env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: flex-end; }
-  #touch .padL { left: calc(14px + env(safe-area-inset-left)); }
-  #touch .padR { right: calc(14px + env(safe-area-inset-right)); }
-  #touch button.small { width: 56px; height: 56px; font-size: 13px; }
-  #touch button.wide { width: 92px; }
-  #chatBtn { position: absolute; top: 10px; right: calc(10px + env(safe-area-inset-right)); width: 84px !important; height: 44px !important; font-size: 15px !important; }
+  canvas { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); display: block;
+    touch-action: none; image-rendering: pixelated; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  #hid { position: fixed; left: 0; top: 0; width: 120px; height: 30px; opacity: 0; font-size: 16px;
+    border: 0; padding: 0; z-index: -1; pointer-events: none; }
 </style>
 </head>
 <body>
-
-<div id="title">
-  <h1>REALISTA PARTY</h1>
-  <div class="menu-group">
-    <label>YOUR NAME</label>
-    <input id="nameInput" maxlength="12" placeholder="Enter name">
-  </div>
-  <div class="menu-group">
-    <label>SKIN</label>
-    <div class="skin-select">
-      <button class="skin-btn active" data-skin="guy">Guy</button>
-      <button class="skin-btn" data-skin="gunk">Gunk</button>
-    </div>
-  </div>
-  <button id="connect">Connect</button>
-</div>
-
-<div id="game">
-  <canvas id="c"></canvas>
-  <div id="hint"></div>
-  <div id="portrait">Turn your phone sideways for a bigger view</div>
-  <div id="log"></div>
-  <input id="chatInput" maxlength="100" autocomplete="off" autocapitalize="off" enterkeyhint="send" placeholder="Type and press Enter">
-  <div id="touch">
-    <div class="pad padL">
-      <button data-k="left">&lt;</button>
-      <button data-k="right">&gt;</button>
-    </div>
-    <div class="pad padR">
-      <button data-k="drop" class="small">DROP</button>
-      <button data-k="act" class="wide" id="actBtn">GRAB</button>
-      <button data-k="jump">JUMP</button>
-    </div>
-    <button id="chatBtn">CHAT</button>
-  </div>
-</div>
+<canvas id="c"></canvas>
+<input id="hid" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" aria-hidden="true" tabindex="-1">
 
 <script>
 (() => {
-  const W = 960, H = 540;
+  'use strict';
+
+  const VH = 540;
+  let VW = 960, K = 1;
   const GRAV = 1800, SPEED = 260, JUMP = 700;
-  const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
-  if (isTouch) document.body.classList.add("touch");
+  const FONT_CW = 6, FONT_CH = 8, FONT_COLS = 16;
+  const SKINS = [
+    { id: 'realista', file: 'sprites.png', label: 'REALISTA' },
+    { id: 'gunk', file: 'sprites_gunk.png', label: 'GUNK' },
+  ];
+  const BG = '#d6d6d6';
+  const INK = '#1c1c1c';
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const approach = (v, t, a) => (v < t ? Math.min(t, v + a) : Math.max(t, v - a));
 
-  const $ = (id) => document.getElementById(id);
-  const canvas = $("c"), ctx = canvas.getContext("2d");
-  const chatInput = $("chatInput"), logEl = $("log"), actBtn = $("actBtn");
-  $("hint").textContent = isTouch
-    ? "Move, jump, GRAB box/player, DROP, CHAT"
-    : "A/D move   W jump   E grab/throw   Q drop   Y chat";
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const hid = document.getElementById('hid');
 
-  // ---------- assets ----------
-  const sheets = {
-    guy: new Image(),
-    gunk: new Image()
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
   };
-  const boxImg = new Image();
-  let loaded = 0;
-  const onLoad = () => { loaded++; };
-  sheets.guy.onload = sheets.gunk.onload = boxImg.onload = onLoad;
-  sheets.guy.src = "sprites.png";
-  sheets.gunk.src = "sprites.png"; // Fallback or distinct if available
-  boxImg.src = "box.png";
+  let soundOn = store.get('rp_sound', '1') === '1';
 
-  let selectedSkin = "guy";
-  document.querySelectorAll(".skin-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".skin-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedSkin = btn.dataset.skin;
+  let fontImg = null, boxG = null, assetsReady = false;
+  const sheets = {};
+  const tints = {};
+
+  function loadImg(src) {
+    return new Promise((res) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => res(null);
+      i.src = src;
     });
+  }
+
+  function gray(img) {
+    if (!img) return null;
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    try {
+      const d = x.getImageData(0, 0, c.width, c.height), a = d.data;
+      for (let i = 0; i < a.length; i += 4) {
+        let l = a[i] * 0.299 + a[i + 1] * 0.587 + a[i + 2] * 0.114;
+        l = (l - 128) * 1.08 + 128;
+        l = l < 0 ? 0 : l > 255 ? 255 : l;
+        a[i] = a[i + 1] = a[i + 2] = l;
+      }
+      x.putImageData(d, 0, 0);
+    } catch (e) {}
+    return c;
+  }
+
+  Promise.all([loadImg('font.png'), loadImg('box.png')].concat(SKINS.map((s) => loadImg(s.file)))).then((r) => {
+    fontImg = r[0];
+    boxG = gray(r[1]);
+    SKINS.forEach((s, i) => { sheets[s.id] = gray(r[2 + i]); });
+    assetsReady = true;
   });
 
-  let ws = null, plats = [], playing = false;
-  const me = { id: 0, name: "Guy", skin: "guy", x: 480, y: 100, vx: 0, vy: 0, f: 1, g: false, anim: 0, hold: 0, carry: 0, carriedBy: 0, stun: 0 };
-  const others = new Map();   // id -> {name,skin,x,y,tx,ty,vx,f,g,ra,hold,carry,carriedBy,anim}
-  const boxes = new Map();    // id -> {x,y,tx,ty,r,holder}
-  const bubbles = new Map();  // id -> {lines, until}
-  let reachT = 0, jumpBuf = 0, coyote = 0, chatOpen = false;
+  function fontTint(color) {
+    if (tints[color]) return tints[color];
+    const c = document.createElement('canvas');
+    c.width = fontImg.width; c.height = fontImg.height;
+    const x = c.getContext('2d');
+    x.drawImage(fontImg, 0, 0);
+    x.globalCompositeOperation = 'source-in';
+    x.fillStyle = color;
+    x.fillRect(0, 0, c.width, c.height);
+    tints[color] = c;
+    return c;
+  }
+  function glyphs(str, x, y, s, color) {
+    const t = fontTint(color);
+    for (let i = 0; i < str.length; i++) {
+      let c = str.charCodeAt(i) - 32;
+      if (c < 0 || c > 94) c = 31;
+      ctx.drawImage(t, (c % FONT_COLS) * FONT_CW, ((c / FONT_COLS) | 0) * FONT_CH, FONT_CW, FONT_CH,
+        x + i * FONT_CW * s, y, FONT_CW * s, FONT_CH * s);
+    }
+  }
+  const textW = (str, s) => String(str).length * FONT_CW * s;
+  function drawText(str, x, y, s, color, align, outline) {
+    if (!fontImg) return;
+    str = String(str);
+    const w = textW(str, s);
+    if (align === 'center') x -= w / 2; else if (align === 'right') x -= w;
+    x = Math.round(x); y = Math.round(y);
+    if (outline) {
+      glyphs(str, x - s, y, s, outline); glyphs(str, x + s, y, s, outline);
+      glyphs(str, x, y - s, s, outline); glyphs(str, x, y + s, s, outline);
+    }
+    glyphs(str, x, y, s, color || INK);
+  }
+  function wrap(text, n) {
+    const words = String(text).split(/\s+/), lines = [];
+    let cur = '';
+    for (let w of words) {
+      while (w.length > n) { if (cur) { lines.push(cur); cur = ''; } lines.push(w.slice(0, n)); w = w.slice(n); }
+      if ((cur + ' ' + w).trim().length > n) { lines.push(cur); cur = w; } else cur = (cur + ' ' + w).trim();
+    }
+    if (cur) lines.push(cur);
+    return lines.length ? lines : [''];
+  }
+
+  let ac = null, master = null, bufWalk = null, bufScream = null, screams = 0;
+  const voices = new Map();
+
+  function loadBuf(url) {
+    return fetch(url)
+      .then((r) => { if (!r.ok) throw new Error('missing'); return r.arrayBuffer(); })
+      .then((ab) => new Promise((res, rej) => ac.decodeAudioData(ab, res, rej)))
+      .catch(() => null);
+  }
+  function initAudio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { ac = new AC(); } catch (e) { ac = null; return; }
+    master = ac.createGain();
+    master.gain.value = soundOn ? 1 : 0;
+    master.connect(ac.destination);
+    if (ac.state === 'suspended') ac.resume();
+    loadBuf('walk.mp3').then((b) => { bufWalk = b; });
+    loadBuf('scream.mp3').then((b) => { bufScream = b; });
+  }
+  function walkVoice(id, on, vol) {
+    if (!ac || !bufWalk) return;
+    let v = voices.get(id);
+    const t = ac.currentTime;
+    if (on && vol > 0.01) {
+      if (!v) {
+        const src = ac.createBufferSource();
+        src.buffer = bufWalk;
+        src.loop = true;
+        const g = ac.createGain();
+        g.gain.value = 0;
+        src.connect(g); g.connect(master);
+        try { src.start(0, Math.random() * bufWalk.duration); } catch (e) { src.start(0); }
+        v = { src, g };
+        voices.set(id, v);
+      }
+      v.g.gain.setTargetAtTime(vol, t, 0.05);
+    } else if (v) {
+      v.g.gain.setTargetAtTime(0, t, 0.04);
+      try { v.src.stop(t + 0.2); } catch (e) {}
+      voices.delete(id);
+    }
+  }
+  function stopVoices() { for (const id of [...voices.keys()]) walkVoice(id, false, 0); }
+  function playScream(vol) {
+    if (!ac || !bufScream || !soundOn || vol < 0.02 || screams >= 3) return;
+    const src = ac.createBufferSource();
+    src.buffer = bufScream;
+    const g = ac.createGain();
+    g.gain.value = vol;
+    src.connect(g); g.connect(master);
+    screams++;
+    src.onended = () => { screams--; };
+    src.start();
+  }
+  function setSound(on) {
+    soundOn = on;
+    store.set('rp_sound', on ? '1' : '0');
+    if (master) master.gain.value = on ? 1 : 0;
+    if (!on) stopVoices();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { pendingSync = true; clearHeld(); stopVoices(); }
+    else { last = performance.now(); acc = 0; }
+    if (!ac) return;
+    if (document.hidden) ac.suspend(); else ac.resume();
+  });
+
+  let ws = null, connecting = false, scene = 'title', playing = false, titleMsg = '';
+  let WW = 3200, WH = 800, plats = [], joinedAt = 0;
+  const savedSkin = store.get('rp_skin', 'realista');
+  const me = { id: 0, name: '', skin: savedSkin === 'guy' ? 'realista' : savedSkin, x: 1500, y: 100, vx: 0, vy: 0, f: 1, g: false,
+    anim: 0, hold: 0, carry: 0, carriedBy: 0, sq: 0, spin: 0 };
+  const others = new Map();
+  const boxes = new Map();
+  const bubbles = new Map();
+  const chatLog = [];
+  const cam = { x: 0, y: 0 };
+  let flingT = 0, reachT = 0, jumpBuf = 0, coyote = 0;
+  let pendingSync = false, wantName = '', lastFix = 0;
+  let chatOpen = false, menuOpen = false, inputMode = null;
   const keys = { left: false, right: false, jump: false };
   const touch = { left: false, right: false, jump: false };
+  const ptrs = new Map();
+  const pointer = { x: -1, y: -1 };
 
-  let K = 1;
+  const uiBlocked = () => chatOpen || menuOpen;
+
+  function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+
   function resize() {
-    const s = Math.min(innerWidth / W, innerHeight / H);
+    if (document.activeElement === hid) return;
+    const iw = innerWidth, ih = innerHeight;
+    VW = Math.round(clamp(VH * (iw / ih), 720, 1280));
+    const s = Math.min(iw / VW, ih / VH);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.style.width = Math.floor(W * s) + "px";
-    canvas.style.height = Math.floor(H * s) + "px";
-    canvas.width = Math.round(W * s * dpr);
-    canvas.height = Math.round(H * s * dpr);
-    K = canvas.width / W;
-    $("portrait").style.display = (isTouch && innerHeight > innerWidth) ? "block" : "none";
+    const pr = Math.max(0.5, Math.min(dpr, 1920 / (VW * s)));
+    canvas.style.width = Math.floor(VW * s) + 'px';
+    canvas.style.height = Math.floor(VH * s) + 'px';
+    canvas.width = Math.max(1, Math.round(VW * s * pr));
+    canvas.height = Math.max(1, Math.round(VH * s * pr));
+    K = canvas.width / VW;
   }
-  addEventListener("resize", resize);
-  addEventListener("orientationchange", () => setTimeout(resize, 200));
+  addEventListener('resize', resize);
+  addEventListener('orientationchange', () => setTimeout(resize, 250));
 
-  const connectBtn = $("connect");
-  connectBtn.addEventListener("click", () => {
-    if (ws || loaded < 2) return;
-    const customName = $("nameInput").value.trim();
-    connectBtn.disabled = true;
-    connectBtn.textContent = "Connecting...";
-    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host);
-    ws.onmessage = onMessage;
-    ws.onopen = () => {
-      if (customName) ws.send(JSON.stringify({ t: "n", n: customName }));
-      if (selectedSkin) ws.send(JSON.stringify({ t: "k", k: selectedSkin }));
-    };
-    ws.onclose = ws.onerror = () => {
-      if (!ws) return;
-      ws = null; playing = false;
-      closeChat();
-      $("game").style.display = "none";
-      $("title").style.display = "flex";
-      connectBtn.disabled = false;
-      connectBtn.textContent = "Connect";
-    };
-  });
-
-  function onMessage(ev) {
-    let m; try { m = JSON.parse(ev.data); } catch { return; }
-    if (m.t === "full") {
-      alert("Server is full!");
-      ws.close();
+  function connect() {
+    if (ws || connecting || !assetsReady) return;
+    initAudio();
+    connecting = true;
+    titleMsg = '';
+    let sock;
+    try {
+      sock = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+    } catch (e) {
+      connecting = false;
+      titleMsg = 'COULD NOT CONNECT';
       return;
     }
-    if (m.t === "w") {
-      me.id = m.id; me.name = m.name; me.x = m.x; me.y = m.y; me.vx = me.vy = 0; me.hold = 0; me.carry = 0; me.carriedBy = 0;
-      plats = m.plats;
-      others.clear(); boxes.clear(); bubbles.clear(); logEl.innerHTML = "";
-      $("title").style.display = "none";
-      $("game").style.display = "flex";
-      playing = true;
-      resize();
-      last = performance.now();
-    } else if (m.t === "s") {
+    ws = sock;
+    const end = () => {
+      if (ws !== sock) return;
+      const wasPlaying = playing;
+      ws = null; connecting = false; playing = false; scene = 'title';
+      chatOpen = false; menuOpen = false; inputMode = null;
+      hid.blur();
+      stopVoices();
+      if (!titleMsg) titleMsg = wasPlaying ? 'DISCONNECTED' : 'COULD NOT CONNECT';
+    };
+    sock.onmessage = onMessage;
+    sock.onclose = end;
+    sock.onerror = end;
+  }
+
+  function onMessage(ev) {
+    let m;
+    try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.t === 'w') {
+      me.id = m.id; me.name = m.name; me.x = m.x; me.y = m.y;
+      me.vx = me.vy = 0; me.hold = 0; me.carry = 0; me.carriedBy = 0; me.g = false; me.sq = 0; me.spin = 0;
+      flingT = 0;
+      WW = m.W; WH = m.H; plats = m.plats;
+      others.clear(); boxes.clear(); bubbles.clear(); chatLog.length = 0;
+      scene = 'game'; playing = true; connecting = false;
+      joinedAt = performance.now();
+      cam.x = clamp(me.x - VW / 2, 0, WW - VW);
+      cam.y = clamp(me.y - VH * 0.68, 0, WH - VH);
+      const savedName = store.get('rp_name', '');
+      wantName = savedName;
+      pendingSync = false;
+      if (savedName) send({ t: 'n', n: savedName });
+      if (!SKINS.some((s) => s.id === me.skin)) me.skin = 'realista';
+      send({ t: 'k', k: me.skin });
+    } else if (m.t === 'full') {
+      titleMsg = 'ROOM IS FULL';
+    } else if (m.t === 's') {
       const seen = new Set();
-      for (const [id, name, x, y, vx, f, g, ra, hold, carry, skin] of m.p) {
+      for (const e of m.p) {
+        const id = e[0];
         if (id === me.id) {
-          me.hold = hold; me.carry = carry;
-          me.skin = skin || me.skin;
+          me.hold = e[8]; me.carry = e[9]; me.name = e[1];
+          const tn = performance.now();
+          if (pendingSync && !document.hidden) {
+            me.x = e[2]; me.y = e[3]; me.vx = e[4]; me.vy = 0; me.g = !!e[6];
+            flingT = 0; me.spin = 0; pendingSync = false;
+          }
+          if (tn - lastFix > 800) {
+            if (e[10] !== me.skin) { send({ t: 'k', k: me.skin }); lastFix = tn; }
+            else if (wantName && e[1] !== wantName) { send({ t: 'n', n: wantName }); lastFix = tn; }
+          }
           continue;
         }
         seen.add(id);
         let o = others.get(id);
-        if (!o) { o = { name, skin, x, y, tx: x, ty: y, vx, f, g, ra, hold, carry, carriedBy: 0, anim: 0 }; others.set(id, o); }
-        o.name = name; o.skin = skin || "guy"; o.tx = x; o.ty = y; o.vx = vx; o.f = f; o.g = !!g; o.ra = !!ra; o.hold = hold; o.carry = carry;
+        const g = !!e[6];
+        if (!o) {
+          o = { name: e[1], x: e[2], y: e[3], tx: e[2], ty: e[3], vx: e[4], f: e[5], g, ra: !!e[7], hold: e[8],
+            carry: e[9], skin: e[10], anim: 0, sq: 0, flingT: 0, spin: 0, carriedBy: 0 };
+          others.set(id, o);
+        } else if (!o.g && g) {
+          o.sq = 0.14;
+        }
+        o.name = e[1]; o.tx = e[2]; o.ty = e[3]; o.vx = e[4]; o.f = e[5]; o.g = g; o.ra = !!e[7];
+        o.hold = e[8]; o.carry = e[9]; o.skin = e[10];
       }
       for (const id of [...others.keys()]) if (!seen.has(id)) { others.delete(id); bubbles.delete(id); }
+      me.carriedBy = 0;
+      for (const o of others.values()) o.carriedBy = 0;
+      for (const e of m.p) {
+        const cid = e[9];
+        if (!cid) continue;
+        if (cid === me.id) me.carriedBy = e[0];
+        else { const v = others.get(cid); if (v) v.carriedBy = e[0]; }
+      }
       const seenB = new Set();
-      for (const [id, x, y, r, holder] of m.b) {
-        seenB.add(id);
-        let b = boxes.get(id);
-        if (!b) { b = { x, y, tx: x, ty: y, r, tr: r, holder }; boxes.set(id, b); }
-        b.tx = x; b.ty = y; b.tr = r; b.holder = holder;
+      for (const e of m.b) {
+        seenB.add(e[0]);
+        let b = boxes.get(e[0]);
+        if (!b) { b = { x: e[1], y: e[2], tx: e[1], ty: e[2], r: e[3], tr: e[3], holder: e[4] }; boxes.set(e[0], b); }
+        b.tx = e[1]; b.ty = e[2]; b.tr = e[3]; b.holder = e[4];
       }
       for (const id of [...boxes.keys()]) if (!seenB.has(id)) boxes.delete(id);
-    } else if (m.t === "f") {
+    } else if (m.t === 'f') {
       if (m.id === me.id) {
-        me.vx = m.vx; me.vy = m.vy; me.carriedBy = 0;
-        me.stun = performance.now() + 600;
+        me.vx = m.vx; me.vy = m.vy; me.g = false; me.carriedBy = 0;
+        flingT = m.k ? 0.9 : 0;
+        me.spin = 0;
+        if (m.k) playScream(1);
       } else {
         const o = others.get(m.id);
-        if (o) { o.vx = m.vx; o.vy = m.vy; o.carriedBy = 0; }
+        if (o && m.k) {
+          o.flingT = 0.9; o.spin = 0;
+          const d = Math.hypot(o.x - me.x, o.y - me.y);
+          playScream(Math.pow(Math.max(0, 1 - d / 1200), 1.5));
+        }
       }
-    } else if (m.t === "c") {
-      addLog(m.name, m.m);
-      bubbles.set(m.id, { lines: wrap(m.m, 22), until: performance.now() + 5000 });
+    } else if (m.t === 'c') {
+      const now = performance.now();
+      chatLog.push({ name: m.name, text: m.m, t: now, lines: wrap(m.name + ': ' + m.m, isTouch ? 28 : 44), plen: m.name.length + 2 });
+      while (chatLog.length > 12) chatLog.shift();
+      bubbles.set(m.id, { lines: wrap(m.m, 20), until: now + 5000 });
     }
   }
 
-  function addLog(name, text) {
-    const d = document.createElement("div");
-    const b = document.createElement("b");
-    b.textContent = name + ": ";
-    d.appendChild(b);
-    d.appendChild(document.createTextNode(text));
-    logEl.appendChild(d);
-    while (logEl.children.length > 6) logEl.removeChild(logEl.firstChild);
-    d._t1 = setTimeout(() => { if (!chatOpen) d.style.opacity = 0; }, 12000);
-    d._t2 = setTimeout(() => d.remove(), 14000);
-  }
-  function openChat() {
-    if (chatOpen || !playing) return;
-    chatOpen = true;
+  function clearHeld() {
     keys.left = keys.right = keys.jump = false;
     touch.left = touch.right = touch.jump = false;
-    for (const d of logEl.children) d.style.opacity = 1;
-    chatInput.value = "";
-    chatInput.style.display = "block";
-    chatInput.focus();
+    ptrs.clear();
+  }
+  function focusInput(mode, initial, max) {
+    inputMode = mode;
+    hid.maxLength = max;
+    hid.value = initial;
+    hid.focus();
+    try { hid.setSelectionRange(hid.value.length, hid.value.length); } catch (e) {}
+  }
+  function openChat() {
+    if (!playing || chatOpen || menuOpen) return;
+    chatOpen = true;
+    clearHeld();
+    focusInput('chat', '', 100);
   }
   function closeChat() {
     if (!chatOpen) return;
     chatOpen = false;
-    chatInput.style.display = "none";
-    chatInput.blur();
+    if (inputMode === 'chat') inputMode = null;
+    hid.value = '';
+    hid.blur();
   }
-  chatInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const text = chatInput.value.trim();
-      if (text && ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "c", m: text }));
-      closeChat();
+  function submitChat() {
+    const text = hid.value.trim();
+    if (text) send({ t: 'c', m: text });
+    closeChat();
+  }
+  function commitName() {
+    if (inputMode !== 'name') return;
+    const v = hid.value.replace(/[^\x20-\x7e]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12);
+    inputMode = null;
+    hid.value = '';
+    if (v && v !== me.name) {
+      me.name = v;
+      wantName = v;
+      store.set('rp_name', v);
+      send({ t: 'n', n: v });
+    }
+  }
+  function openMenu() {
+    if (!playing || chatOpen || menuOpen) return;
+    menuOpen = true;
+    clearHeld();
+  }
+  function closeMenu() {
+    if (!menuOpen) return;
+    commitName();
+    menuOpen = false;
+    if (document.activeElement === hid) hid.blur();
+  }
+  function setSkin(id) {
+    if (!sheets[id] || me.skin === id) return;
+    me.skin = id;
+    store.set('rp_skin', id);
+    send({ t: 'k', k: id });
+  }
+
+  hid.addEventListener('input', () => {
+    const v = hid.value.replace(/[^\x20-\x7e]/g, '');
+    if (v !== hid.value) hid.value = v;
+  });
+  hid.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
       e.preventDefault();
-    } else if (e.key === "Escape") {
-      closeChat();
+      if (inputMode === 'chat') submitChat();
+      else if (inputMode === 'name') { commitName(); hid.blur(); }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (inputMode === 'chat') closeChat();
+      else if (inputMode === 'name') { inputMode = null; hid.value = ''; hid.blur(); }
     }
     e.stopPropagation();
   });
-  chatInput.addEventListener("blur", () => setTimeout(closeChat, 120));
-  $("chatBtn").addEventListener("click", (e) => { e.preventDefault(); openChat(); });
+  hid.addEventListener('blur', () => {
+    setTimeout(() => {
+      if (document.activeElement === hid) return;
+      if (inputMode === 'chat') closeChat();
+      else if (inputMode === 'name') commitName();
+    }, 120);
+  });
 
-  function wrap(text, n) {
-    const words = text.split(/\s+/), lines = []; let cur = "";
-    for (let w of words) {
-      while (w.length > n) { if (cur) { lines.push(cur); cur = ""; } lines.push(w.slice(0, n)); w = w.slice(n); }
-      if ((cur + " " + w).trim().length > n) { lines.push(cur); cur = w; } else cur = (cur + " " + w).trim();
-    }
-    if (cur) lines.push(cur);
-    return lines;
+  function doAct() {
+    if (!playing || uiBlocked() || me.carriedBy || flingT > 0) return;
+    if (!me.hold && !me.carry) reachT = 0.25;
+    send({ t: 'a' });
+  }
+  function doDrop() {
+    if (!playing || uiBlocked() || me.carriedBy) return;
+    send({ t: 'd' });
+  }
+  function pressJump() {
+    if (!playing || uiBlocked()) return;
+    if (me.carriedBy) { send({ t: 'b' }); return; }
+    jumpBuf = 0.12;
   }
 
-  function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
-  function doAct() {
-    if (!playing || chatOpen) return;
-    if (me.carriedBy) {
-      send({ t: "b" }); // wriggle if being carried
+  const KEYMAP = {
+    KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+    KeyW: 'jump', ArrowUp: 'jump', Space: 'jump',
+  };
+  addEventListener('keydown', (e) => {
+    if (scene === 'title') {
+      if (e.code === 'Enter' || e.code === 'NumpadEnter') connect();
       return;
     }
-    if (!me.hold && !me.carry) reachT = 0.25;
-    send({ t: "a" });
-  }
-  function doDrop() { if (playing && !chatOpen) send({ t: "d" }); }
-  function pressJump() { 
-    if (me.carriedBy) { send({ t: "b" }); return; }
-    jumpBuf = 0.12; 
-  }
-
-  const MAP = {
-    KeyA: "left", ArrowLeft: "left", KeyD: "right", ArrowRight: "right",
-    KeyW: "jump", ArrowUp: "jump", Space: "jump",
-  };
-  addEventListener("keydown", (e) => {
-    if (!playing || document.activeElement === chatInput) return;
-    if (e.code === "KeyY") { e.preventDefault(); openChat(); return; }
-    const k = MAP[e.code];
+    if (!playing || document.activeElement === hid) return;
+    if (e.code === 'KeyY') { e.preventDefault(); openChat(); return; }
+    if (e.code === 'KeyM') { e.preventDefault(); if (menuOpen) closeMenu(); else openMenu(); return; }
+    if (e.code === 'Escape') { if (menuOpen) closeMenu(); return; }
+    if (uiBlocked()) return;
+    const k = KEYMAP[e.code];
     if (k) {
       e.preventDefault();
-      if (k === "jump" && !keys.jump) pressJump();
+      if (k === 'jump' && !keys.jump) pressJump();
       keys[k] = true;
-    } else if (e.code === "KeyE" || e.code === "KeyF") {
+    } else if (e.code === 'KeyE' || e.code === 'KeyF') {
       e.preventDefault();
       if (!e.repeat) doAct();
-    } else if (e.code === "KeyQ") {
+    } else if (e.code === 'KeyQ') {
       if (!e.repeat) doDrop();
     }
   });
-  addEventListener("keyup", (e) => {
-    const k = MAP[e.code];
+  addEventListener('keyup', (e) => {
+    const k = KEYMAP[e.code];
     if (k) keys[k] = false;
   });
-  addEventListener("blur", () => { keys.left = keys.right = keys.jump = false; });
+  addEventListener('blur', () => { keys.left = keys.right = keys.jump = false; });
 
-  document.querySelectorAll("#touch button[data-k]").forEach((btn) => {
-    const k = btn.dataset.k;
-    const down = (e) => {
-      e.preventDefault();
-      btn.classList.add("down");
-      try { btn.setPointerCapture(e.pointerId); } catch {}
-      if (k === "act") doAct();
-      else if (k === "drop") doDrop();
-      else { if (k === "jump" && !touch.jump) pressJump(); touch[k] = true; }
+  const hit = (r, p, pad) => {
+    pad = pad || 0;
+    return p.x >= r.x - pad && p.x <= r.x + r.w + pad && p.y >= r.y - pad && p.y <= r.y + r.h + pad;
+  };
+  function toLogical(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * VW / r.width, y: (e.clientY - r.top) * VH / r.height };
+  }
+  function touchZones() {
+    return [
+      { k: 'left', x: 18, y: VH - 118, w: 96, h: 96, label: '<', hold: true },
+      { k: 'right', x: 126, y: VH - 118, w: 96, h: 96, label: '>', hold: true },
+      { k: 'jump', x: VW - 118, y: VH - 128, w: 100, h: 106, label: 'JUMP', hold: true },
+      { k: 'act', x: VW - 236, y: VH - 118, w: 106, h: 96, label: (me.hold || me.carry) ? 'THROW' : 'GRAB' },
+      { k: 'drop', x: VW - 228, y: VH - 200, w: 90, h: 64, label: 'DROP' },
+    ];
+  }
+  const menuBtnRect = () => ({ x: VW - 96, y: 10, w: 86, h: 36 });
+  const chatBtnRect = () => ({ x: VW - 192, y: 10, w: 86, h: 36 });
+  const connectRect = () => ({ x: (VW - 280) / 2, y: (VH - 76) / 2, w: 280, h: 76 });
+  function menuRects() {
+    const w = 560, h = 330;
+    const x = Math.round((VW - w) / 2), y = isTouch ? 10 : Math.round((VH - h) / 2);
+    return {
+      panel: { x, y, w, h },
+      name: { x: x + 20, y: y + 84, w: 300, h: 40 },
+      ok: { x: x + 330, y: y + 84, w: 100, h: 40 },
+      skins: SKINS.map((s, i) => ({ x: x + 20 + i * 136, y: y + 160, w: 124, h: 150, id: s.id, label: s.label })),
+      sound: { x: x + 330, y: y + 170, w: 210, h: 50 },
+      close: { x: x + 330, y: y + 240, w: 210, h: 50 },
     };
-    const up = (e) => {
-      e.preventDefault();
-      btn.classList.remove("down");
-      if (k in touch) touch[k] = false;
-    };
-    btn.addEventListener("pointerdown", down);
-    btn.addEventListener("pointerup", up);
-    btn.addEventListener("pointercancel", up);
-    btn.addEventListener("lostpointercapture", up);
+  }
+
+  function syncHold() {
+    const vals = new Set(ptrs.values());
+    const nj = vals.has('jump');
+    if (nj && !touch.jump) pressJump();
+    touch.left = vals.has('left');
+    touch.right = vals.has('right');
+    touch.jump = nj;
+  }
+  canvas.addEventListener('pointerdown', (e) => {
+    const p = toLogical(e);
+    pointer.x = p.x; pointer.y = p.y;
+    if (scene !== 'game' || !playing || uiBlocked() || !isTouch) return;
+    for (const z of touchZones()) {
+      if (!hit(z, p, 10)) continue;
+      if (z.hold) { ptrs.set(e.pointerId, z.k); syncHold(); }
+      else if (z.k === 'act') doAct();
+      else if (z.k === 'drop') doDrop();
+      break;
+    }
   });
-  document.addEventListener("contextmenu", (e) => e.preventDefault());
-  document.addEventListener("touchmove", (e) => { if (e.target !== chatInput) e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('pointermove', (e) => {
+    const p = toLogical(e);
+    pointer.x = p.x; pointer.y = p.y;
+    if (!ptrs.has(e.pointerId)) return;
+    const z = touchZones().find((t) => t.hold && hit(t, p, 24));
+    if (z) ptrs.set(e.pointerId, z.k); else ptrs.delete(e.pointerId);
+    syncHold();
+  });
+  const release = (e) => { if (ptrs.delete(e.pointerId)) syncHold(); };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('lostpointercapture', release);
+  canvas.addEventListener('click', (e) => {
+    const p = toLogical(e);
+    if (scene === 'title') { if (hit(connectRect(), p)) connect(); return; }
+    if (!playing) return;
+    if (menuOpen) {
+      const R = menuRects();
+      if (hit(R.name, p)) focusInput('name', me.name, 12);
+      else if (hit(R.ok, p)) { commitName(); hid.blur(); }
+      else if (hit(R.sound, p)) setSound(!soundOn);
+      else if (hit(R.close, p)) closeMenu();
+      else { for (const s of R.skins) if (hit(s, p)) setSkin(s.id); }
+      return;
+    }
+    if (chatOpen) return;
+    if (hit(menuBtnRect(), p)) openMenu();
+    else if (isTouch && hit(chatBtnRect(), p)) openChat();
+  });
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('touchmove', (e) => { if (e.target !== hid) e.preventDefault(); }, { passive: false });
 
-  const approach = (v, t, a) => (v < t ? Math.min(t, v + a) : Math.max(t, v - a));
   function stepMe(dt) {
-    if (me.carriedBy) return; // position controlled by carrier
-    const left = keys.left || touch.left, right = keys.right || touch.right;
-    const jumpHeld = keys.jump || touch.jump;
-    const dir = (right ? 1 : 0) - (left ? 1 : 0);
-    if (dir) me.f = dir;
-    me.vx = approach(me.vx, dir * SPEED, (dir ? (me.g ? 3000 : 2000) : (me.g ? 3200 : 500)) * dt);
+    me.anim += dt;
+    if (reachT > 0) reachT = Math.max(0, reachT - dt);
+    if (me.sq > 0) me.sq = Math.max(0, me.sq - dt);
 
-    jumpBuf = Math.max(0, jumpBuf - dt);
-    coyote = me.g ? 0.1 : Math.max(0, coyote - dt);
-    if (jumpBuf > 0 && coyote > 0) { me.vy = -JUMP; jumpBuf = 0; coyote = 0; me.g = false; }
-    if (!jumpHeld && me.vy < -250) me.vy = -250;
+    if (me.carriedBy) {
+      const c = others.get(me.carriedBy);
+      if (c) { me.x = c.x + c.f * 26; me.y = c.y - 20; me.f = c.f; }
+      me.vx = 0; me.vy = 0; me.g = false; flingT = 0; me.spin = 0;
+      return;
+    }
+
+    const blocked = uiBlocked();
+    const left = !blocked && (keys.left || touch.left);
+    const right = !blocked && (keys.right || touch.right);
+    const jumpHeld = !blocked && (keys.jump || touch.jump);
+
+    if (flingT > 0) {
+      flingT -= dt;
+      me.spin += (me.vx >= 0 ? 1 : -1) * 14 * dt;
+      if (me.g) me.vx = approach(me.vx, 0, 1200 * dt);
+      if (me.g && flingT < 0.55) flingT = 0;
+      jumpBuf = 0;
+    } else {
+      me.spin = 0;
+      const dir = (right ? 1 : 0) - (left ? 1 : 0);
+      if (dir) me.f = dir;
+      me.vx = approach(me.vx, dir * SPEED, (dir ? (me.g ? 3000 : 2000) : (me.g ? 3200 : 500)) * dt);
+      jumpBuf = Math.max(0, jumpBuf - dt);
+      coyote = me.g ? 0.1 : Math.max(0, coyote - dt);
+      if (jumpBuf > 0 && coyote > 0) { me.vy = -JUMP; jumpBuf = 0; coyote = 0; me.g = false; }
+      if (!jumpHeld && me.vy < -250) me.vy = -250;
+    }
 
     me.x += me.vx * dt;
-    if (me.x < 16) { me.x = 16; me.vx = 0; }
-    if (me.x > W - 16) { me.x = W - 16; me.vx = 0; }
+    if (me.x < 16) { me.x = 16; me.vx = flingT > 0 ? -me.vx * 0.4 : 0; }
+    else if (me.x > WW - 16) { me.x = WW - 16; me.vx = flingT > 0 ? -me.vx * 0.4 : 0; }
 
     const prevY = me.y;
     me.vy += GRAV * dt;
     me.y += me.vy * dt;
+    const wasG = me.g;
     me.g = false;
+    let impact = 0;
     for (const p of plats) {
       if (me.vy >= 0 && prevY <= p.y + 0.5 && me.y >= p.y && me.x + 13 > p.x && me.x - 13 < p.x + p.w) {
+        impact = Math.max(impact, me.vy);
         me.y = p.y; me.vy = 0; me.g = true;
       }
     }
+    if (me.g && !wasG && impact > 250) me.sq = 0.14;
     if (me.y < 0) { me.y = 0; me.vy = Math.max(me.vy, 0); }
-    if (me.y > 800) { me.y = 200; me.vy = 0; } // safety net
-    me.anim += dt;
-    reachT = Math.max(0, reachT - dt);
+    if (me.y > WH + 40) { me.y = 100; me.vy = 0; }
   }
 
-  function drawGuy(x, y, f, g, vx, anim, holding, carrying, reach, reachElapsed, skin) {
-    let row, col;
-    if (reach && !holding && !carrying) { row = 2; col = reachElapsed < 0.1 ? 0 : 1; }
-    else {
-      row = (holding || carrying) ? 1 : 0;
-      if (!g) col = 6;
-      else if (Math.abs(vx) > 15) col = 2 + (Math.floor(anim * 10) % 4);
-      else col = Math.floor(anim * 2.5) % 2;
-    }
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(f, 1);
-    const img = sheets[skin] || sheets.guy;
-    ctx.drawImage(img, col * 32, row * 32, 32, 32, -32, -64, 64, 64);
-    ctx.restore();
-  }
-  function drawBox(x, y, r) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(r);
-    ctx.drawImage(boxImg, -16, -16, 32, 32);
-    ctx.restore();
-  }
-  function drawTag(x, y, name, mine) {
-    ctx.font = (mine ? "bold " : "") + "12px 'Courier New', monospace";
-    ctx.textAlign = "center";
-    ctx.fillStyle = mine ? "#333" : "#999";
-    ctx.fillText(name, x, y - 64);
-  }
-  function drawBubble(x, y, b) {
-    ctx.font = "bold 13px 'Courier New', monospace";
-    ctx.textAlign = "center";
-    const lh = 16;
-    let w = 0;
-    for (const l of b.lines) w = Math.max(w, ctx.measureText(l).width);
-    w += 14;
-    const h = b.lines.length * lh + 8;
-    let bx = Math.max(4, Math.min(W - w - 4, x - w / 2));
-    const by = y - 76 - h;
-    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#999"; ctx.lineWidth = 2;
-    ctx.fillRect(bx, by, w, h); ctx.strokeRect(bx, by, w, h);
-    ctx.fillStyle = "#222";
-    b.lines.forEach((l, i) => ctx.fillText(l, bx + w / 2, by + 16 + i * lh - 2));
-  }
-
-  function render(now, dt) {
-    ctx.setTransform(K, 0, 0, K, 0, 0);
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, W, H);
-
-    for (const p of plats) {
-      if (p.y >= 750) {
-        ctx.fillStyle = "#ededed"; ctx.fillRect(p.x, p.y, p.w, H - p.y);
-        ctx.fillStyle = "#b9b9b9"; ctx.fillRect(p.x, p.y, p.w, 3);
-      } else {
-        ctx.fillStyle = "#dadada"; ctx.fillRect(p.x, p.y, p.w, 10);
-        ctx.fillStyle = "#b0b0b0"; ctx.fillRect(p.x, p.y, p.w, 3);
-      }
-    }
-
+  function updateWorld(dt) {
     const a = 1 - Math.exp(-dt * 20);
     for (const o of others.values()) {
       if (Math.abs(o.tx - o.x) > 200 || Math.abs(o.ty - o.y) > 200) { o.x = o.tx; o.y = o.ty; }
-      o.x += (o.tx - o.x) * a; o.y += (o.ty - o.y) * a;
+      o.x += (o.tx - o.x) * a;
+      o.y += (o.ty - o.y) * a;
       o.anim += dt;
+      if (o.sq > 0) o.sq = Math.max(0, o.sq - dt);
+      if (o.flingT > 0) { o.flingT -= dt; o.spin += (o.vx >= 0 ? 1 : -1) * 14 * dt; }
     }
     for (const b of boxes.values()) {
       if (Math.abs(b.tx - b.x) > 150 || Math.abs(b.ty - b.y) > 150) { b.x = b.tx; b.y = b.ty; }
-      b.x += (b.tx - b.x) * a; b.y += (b.ty - b.y) * a; b.r += (b.tr - b.r) * a;
+      b.x += (b.tx - b.x) * a;
+      b.y += (b.ty - b.y) * a;
+      b.r += (b.tr - b.r) * a;
     }
+    const tx = clamp(me.x + clamp(me.vx * 0.25, -120, 120) - VW / 2, 0, Math.max(0, WW - VW));
+    const ty = clamp(me.y - VH * 0.68, 0, Math.max(0, WH - VH));
+    const c = 1 - Math.exp(-dt * 6);
+    cam.x += (tx - cam.x) * c;
+    cam.y += (ty - cam.y) * c;
+  }
 
-    for (const [id, b] of boxes) {
-      let x = b.x, y = b.y;
-      if (b.holder === me.id) { x = me.x + me.f * 36; y = me.y - 32; }
-      else if (b.holder && others.has(b.holder)) { const o = others.get(b.holder); x = o.x + o.f * 36; y = o.y - 32; }
-      drawBox(x, y, b.r);
+  function updateSounds() {
+    if (!ac) return;
+    const active = new Set();
+    if (soundOn && playing) {
+      if (me.g && Math.abs(me.vx) > 40 && !me.carriedBy && flingT <= 0) { active.add(0); walkVoice(0, true, 0.5); }
+      for (const [id, o] of others) {
+        if (o.g && Math.abs(o.vx) > 20 && !o.carriedBy && !(o.flingT > 0)) {
+          const d = Math.hypot(o.x - me.x, o.y - me.y);
+          const vol = Math.pow(Math.max(0, 1 - d / 900), 2) * 0.5;
+          if (vol > 0.01) { active.add(id); walkVoice(id, true, vol); }
+        }
+      }
     }
+    for (const id of [...voices.keys()]) if (!active.has(id)) walkVoice(id, false, 0);
+  }
 
-    for (const o of others.values()) {
-      drawGuy(o.x, o.y, o.f, o.g, o.vx, o.anim, !!o.hold, !!o.carry, o.ra, 0.1, o.skin);
-      drawTag(o.x, o.y, o.name, false);
+  function drawGuy(x, y, f, st) {
+    const sheet = sheets[st.skin] || sheets.realista;
+    if (!sheet) return;
+    const cw = sheet.width / 8, ch = sheet.height / 3;
+    const holding = !!(st.hold || st.carry);
+    let row, col;
+    if (st.carried || st.flung) { row = 0; col = 6; }
+    else if (st.reach && !holding) { row = 2; col = st.reachEl < 0.1 ? 0 : 1; }
+    else {
+      row = holding ? 1 : 0;
+      if (!st.g) col = 6;
+      else if (Math.abs(st.vx) > 15) col = 2 + (Math.floor(st.anim * 10) % 4);
+      else col = Math.floor(st.anim * 2.5) % 2;
     }
-    // me
-    drawGuy(me.x, me.y, me.f, me.g, me.vx, me.anim, !!me.hold, !!me.carry, reachT > 0, 0.25 - reachT, me.skin);
-    drawTag(me.x, me.y, me.name, true);
+    ctx.save();
+    ctx.translate(x, y);
+    if (st.carried) {
+      ctx.translate(0, -32);
+      ctx.rotate(f * 0.55 + Math.sin(st.anim * 16) * 0.12);
+      ctx.translate(0, 32);
+    } else if (st.flung) {
+      ctx.translate(0, -32);
+      ctx.rotate(st.spin);
+      ctx.translate(0, 32);
+    }
+    let sx = 1, sy = 1;
+    if (st.sq > 0) { const t = st.sq / 0.14; sx = 1 + 0.2 * t; sy = 1 - 0.2 * t; }
+    else if (!st.g && !st.flung && !st.carried) { sx = 0.95; sy = 1.07; }
+    ctx.scale(f * sx, sy);
+    ctx.drawImage(sheet, col * cw, row * ch, cw, ch, -32, -64, 64, 64);
+    ctx.restore();
+  }
+  function drawBox(x, y, r) {
+    if (!boxG) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(r);
+    ctx.drawImage(boxG, -16, -16, 32, 32);
+    ctx.restore();
+  }
+  function drawBubble(x, y, b, cx) {
+    let w = 0;
+    for (const l of b.lines) w = Math.max(w, textW(l, 2));
+    w += 16;
+    const h = b.lines.length * 18 + 10;
+    const bx = clamp(Math.round(x - w / 2), cx + 4, cx + VW - w - 4);
+    const by = Math.round(y - 96 - h);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(bx - 3, by - 3, w + 6, h + 6);
+    ctx.fillRect(Math.round(x) - 4, by + h + 3, 8, 6);
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(bx, by, w, h);
+    ctx.fillRect(Math.round(x) - 2, by + h, 4, 6);
+    b.lines.forEach((l, i) => drawText(l, bx + 8, by + 5 + i * 18, 2, INK));
+  }
 
-    // bubbles
-    for (const [id, b] of bubbles) {
-      if (now > b.until) { bubbles.delete(id); continue; }
-      const o = id === me.id ? me : others.get(id);
-      if (o) drawBubble(o.x, o.y, b);
+  function drawHills(cx, cy) {
+    const floorY = (plats.length ? plats[0].y : 760) - cy;
+    const layers = [{ f: 0.25, sp: 420, col: '#cdcdcd', h: 120 }, { f: 0.5, sp: 300, col: '#c4c4c4', h: 80 }];
+    for (const L of layers) {
+      ctx.fillStyle = L.col;
+      const off = cx * L.f;
+      const first = Math.floor(off / L.sp) - 1;
+      for (let i = first; i < first + Math.ceil(VW / L.sp) + 3; i++) {
+        const rr = L.h + (((i * 37) % 5) + 5) % 5 * (L.h * 0.25);
+        const x = i * L.sp - off + L.sp / 2;
+        ctx.beginPath();
+        ctx.ellipse(x, floorY + 20, L.sp * 0.62, rr, 0, Math.PI, 0);
+        ctx.fill();
+      }
     }
   }
 
-  // ---------- main loop ----------
-  let last = performance.now(), acc = 0, lastSend = 0, lastLabel = "";
+  function drawWorld() {
+    const cx = Math.round(cam.x), cy = Math.round(cam.y);
+    drawHills(cx, cy);
+    ctx.save();
+    ctx.translate(-cx, -cy);
+
+    for (const p of plats) {
+      if (p.x + p.w < cx || p.x > cx + VW) continue;
+      if (p.w >= WW) {
+        ctx.fillStyle = '#b5b5b5';
+        ctx.fillRect(p.x, p.y, p.w, WH - p.y);
+        ctx.fillStyle = '#a3a3a3';
+        for (let x = Math.floor(cx / 60) * 60; x < cx + VW; x += 60) ctx.fillRect(x, p.y + 14, 22, 3);
+        ctx.fillStyle = '#303030';
+        ctx.fillRect(p.x, p.y, p.w, 4);
+      } else {
+        ctx.fillStyle = '#c2c2c2';
+        ctx.fillRect(p.x, p.y, p.w, 14);
+        ctx.fillStyle = '#8c8c8c';
+        ctx.fillRect(p.x, p.y + 14, p.w, 3);
+        ctx.fillStyle = '#303030';
+        ctx.fillRect(p.x, p.y, p.w, 4);
+      }
+    }
+
+    const inView = (x, y) => x > cx - 120 && x < cx + VW + 120 && y > cy - 160 && y < cy + VH + 160;
+
+    for (const b of boxes.values()) {
+      let x = b.x, y = b.y;
+      if (b.holder === me.id) { x = me.x + me.f * 36; y = me.y - 32; }
+      else if (b.holder && others.has(b.holder)) { const o = others.get(b.holder); x = o.x + o.f * 36; y = o.y - 32; }
+      if (inView(x, y)) drawBox(x, y, b.r);
+    }
+
+    const late = [];
+    const stateOf = (o) => ({ skin: o.skin, hold: o.hold, carry: o.carry, carried: !!o.carriedBy, flung: o.flingT > 0,
+      reach: o.ra, reachEl: 0.1, g: o.g, vx: o.vx, anim: o.anim, sq: o.sq, spin: o.spin });
+    for (const o of others.values()) {
+      if (!inView(o.x, o.y)) continue;
+      if (o.carriedBy) { late.push({ o, mine: false }); continue; }
+      drawGuy(o.x, o.y, o.f, stateOf(o));
+    }
+    const meState = { skin: me.skin, hold: me.hold, carry: me.carry, carried: !!me.carriedBy, flung: flingT > 0,
+      reach: reachT > 0, reachEl: 0.25 - reachT, g: me.g, vx: me.vx, anim: me.anim, sq: me.sq, spin: me.spin };
+    if (me.carriedBy) late.push({ o: me, mine: true });
+    else drawGuy(me.x, me.y, me.f, meState);
+    for (const l of late) drawGuy(l.o.x, l.o.y, l.o.f, l.mine ? meState : stateOf(l.o));
+
+    for (const o of others.values()) if (inView(o.x, o.y)) drawText(o.name, o.x, o.y - 84, 2, '#444', 'center', '#e6e6e6');
+    drawText(me.name, me.x, me.y - 84, 2, '#000', 'center', '#e6e6e6');
+
+    const now = performance.now();
+    for (const [id, b] of bubbles) {
+      if (now > b.until) { bubbles.delete(id); continue; }
+      const o = id === me.id ? me : others.get(id);
+      if (o) drawBubble(o.x, o.y, b, cx);
+    }
+    ctx.restore();
+  }
+
+  const grain = [];
+  const vig = document.createElement('canvas');
+  vig.width = 256; vig.height = 144;
+  const film = { t: 0, tile: 0, ox: 0, oy: 0, flick: 0, scr: [], sp: [] };
+  function initFilm() {
+    for (let n = 0; n < 3; n++) {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const x = c.getContext('2d');
+      const d = x.createImageData(128, 128);
+      for (let i = 0; i < d.data.length; i += 4) {
+        const v = Math.random() < 0.5 ? 0 : 255;
+        d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
+        d.data[i + 3] = Math.random() * 34;
+      }
+      x.putImageData(d, 0, 0);
+      grain.push(ctx.createPattern(c, 'repeat'));
+    }
+    const x = vig.getContext('2d');
+    const g = x.createRadialGradient(128, 72, 30, 128, 72, 150);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.65, 'rgba(0,0,0,0.07)');
+    g.addColorStop(1, 'rgba(0,0,0,0.5)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, 256, 144);
+  }
+  function drawFilm(now) {
+    if (now - film.t > 83) {
+      film.t = now;
+      film.tile = (Math.random() * grain.length) | 0;
+      film.ox = (Math.random() * 128) | 0;
+      film.oy = (Math.random() * 128) | 0;
+      film.flick = Math.random() * 0.07;
+      film.scr = [];
+      if (Math.random() < 0.3) film.scr.push({ x: Math.random() * VW, y: Math.random() * VH * 0.5, l: 60 + Math.random() * VH * 0.6, light: Math.random() < 0.5 });
+      film.sp = [];
+      const n = (Math.random() * 4) | 0;
+      for (let i = 0; i < n; i++) film.sp.push({ x: Math.random() * VW, y: Math.random() * VH, s: 1 + ((Math.random() * 3) | 0) });
+    }
+    ctx.save();
+    ctx.translate(film.ox, film.oy);
+    ctx.fillStyle = grain[film.tile];
+    ctx.fillRect(-film.ox, -film.oy, VW, VH);
+    ctx.restore();
+    ctx.globalAlpha = film.flick;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(vig, 0, 0, VW, VH);
+    ctx.imageSmoothingEnabled = false;
+    for (const s of film.scr) {
+      ctx.fillStyle = s.light ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.35)';
+      ctx.fillRect(s.x, s.y, 1.5, s.l);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    for (const s of film.sp) ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+
+  function button(r, label, s, o) {
+    o = o || {};
+    ctx.fillStyle = o.down ? '#8c8c8c' : o.dark ? 'rgba(70,70,70,0.6)' : o.sel ? '#9a9a9a' : o.hover ? '#c4c4c4' : '#b4b4b4';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(r.x, r.y, r.w, 3);
+    ctx.fillRect(r.x, r.y + r.h - 3, r.w, 3);
+    ctx.fillRect(r.x, r.y, 3, r.h);
+    ctx.fillRect(r.x + r.w - 3, r.y, 3, r.h);
+    drawText(label, r.x + r.w / 2, r.y + (r.h - FONT_CH * s) / 2, s, o.dark ? '#f4f4f4' : INK, 'center');
+  }
+
+  function drawTitle() {
+    const r = connectRect();
+    const label = connecting ? 'CONNECTING' : 'CONNECT';
+    button(r, label, connecting ? 3 : 4, { hover: !isTouch && !connecting && hit(r, pointer), down: connecting });
+    if (titleMsg) drawText(titleMsg, VW / 2, r.y + r.h + 24, 2, '#555', 'center');
+  }
+
+  function drawMinimap() {
+    const w = 220, h = Math.round(w * WH / WW), x = Math.round((VW - w) / 2), y = 10;
+    ctx.fillStyle = 'rgba(240,240,240,0.55)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x - 2, y - 2, w + 4, 2);
+    ctx.fillRect(x - 2, y + h, w + 4, 2);
+    ctx.fillRect(x - 2, y - 2, 2, h + 4);
+    ctx.fillRect(x + w, y - 2, 2, h + 4);
+    const sx = w / WW, sy = h / WH;
+    ctx.fillStyle = '#777';
+    for (const p of plats) ctx.fillRect(x + p.x * sx, y + p.y * sy, Math.max(1, p.w * sx), 1);
+    ctx.fillStyle = '#555';
+    for (const b of boxes.values()) ctx.fillRect(x + b.x * sx - 1, y + b.y * sy - 1, 2, 2);
+    for (const o of others.values()) ctx.fillRect(x + o.x * sx - 2, y + o.y * sy - 4, 4, 4);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x + me.x * sx - 3, y + me.y * sy - 5, 6, 6);
+    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + cam.x * sx, y + cam.y * sy, VW * sx, VH * sy);
+  }
+
+  function drawLog(now) {
+    const maxLines = 8;
+    const out = [];
+    for (let i = chatLog.length - 1; i >= 0 && out.length < maxLines; i--) {
+      const c = chatLog[i];
+      const age = now - c.t;
+      if (age > 14000 && !chatOpen) break;
+      const alpha = chatOpen ? 1 : clamp((14000 - age) / 1500, 0, 1);
+      for (let j = c.lines.length - 1; j >= 0; j--) out.push({ c, j, line: c.lines[j], alpha });
+    }
+    out.length = Math.min(out.length, maxLines);
+    const lh = 20;
+    for (let i = 0; i < out.length; i++) {
+      const o = out[i];
+      const y = isTouch ? (chatOpen ? 56 : 10) + (out.length - 1 - i) * lh : VH - (chatOpen ? 64 : 28) - i * lh;
+      ctx.globalAlpha = o.alpha;
+      ctx.fillStyle = 'rgba(236,236,236,0.85)';
+      ctx.fillRect(10, y - 2, textW(o.line, 2) + 12, lh);
+      const plen = o.c.plen;
+      if (o.j === 0 && o.line.length >= plen) {
+        drawText(o.line.slice(0, plen), 16, y, 2, '#6a6a6a');
+        drawText(o.line.slice(plen), 16 + textW(o.line.slice(0, plen), 2), y, 2, INK);
+      } else {
+        drawText(o.line, 16, y, 2, INK);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawChatBox() {
+    const w = isTouch ? VW - 20 : Math.min(560, VW - 20), h = 36, x = 10, y = isTouch ? 10 : VH - h - 10;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x - 3, y - 3, w + 6, h + 6);
+    ctx.fillStyle = '#ececec';
+    ctx.fillRect(x, y, w, h);
+    const max = Math.floor((w - 24) / (FONT_CW * 2)) - 1;
+    const v = hid.value;
+    const start = Math.max(0, v.length - max);
+    const shown = v.slice(start);
+    if (!v) drawText('TYPE AND PRESS ENTER', x + 12, y + 10, 2, '#8a8a8a');
+    else drawText(shown, x + 12, y + 10, 2, INK);
+    if (Math.floor(performance.now() / 450) % 2 === 0) {
+      const ci = clamp((hid.selectionStart == null ? v.length : hid.selectionStart) - start, 0, shown.length);
+      ctx.fillStyle = INK;
+      ctx.fillRect(x + 12 + ci * FONT_CW * 2, y + 8, 3, 20);
+    }
+  }
+
+  function drawMenu() {
+    const R = menuRects();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, 0, VW, VH);
+    const p = R.panel;
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(p.x - 4, p.y - 4, p.w + 8, p.h + 8);
+    ctx.fillStyle = '#cfcfcf';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    drawText('MENU', p.x + 20, p.y + 20, 3, INK);
+    drawText('NAME', p.x + 20, p.y + 60, 2, '#555');
+    drawText('SKIN', p.x + 20, p.y + 134, 2, '#555');
+
+    const n = R.name, editing = inputMode === 'name';
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(n.x - (editing ? 4 : 3), n.y - (editing ? 4 : 3), n.w + (editing ? 8 : 6), n.h + (editing ? 8 : 6));
+    ctx.fillStyle = '#ececec';
+    ctx.fillRect(n.x, n.y, n.w, n.h);
+    const txt = editing ? hid.value : me.name;
+    drawText(txt, n.x + 10, n.y + 8, 3, INK);
+    if (editing && Math.floor(performance.now() / 450) % 2 === 0) {
+      const ci = clamp(hid.selectionStart == null ? txt.length : hid.selectionStart, 0, txt.length);
+      ctx.fillStyle = INK;
+      ctx.fillRect(n.x + 10 + ci * FONT_CW * 3, n.y + 6, 3, 28);
+    }
+    button(R.ok, 'OK', 3, {});
+
+    for (const s of R.skins) {
+      const sel = me.skin === s.id;
+      button(s, '', 2, { sel });
+      const sh = sheets[s.id];
+      if (sh) {
+        const cw = sh.width / 8, ch = sh.height / 3;
+        ctx.drawImage(sh, 0, 0, cw, ch, s.x + (s.w - 96) / 2, s.y + 8, 96, 96);
+      }
+      drawText(s.label, s.x + s.w / 2, s.y + 118, 2, INK, 'center');
+    }
+    button(R.sound, soundOn ? 'SOUND: ON' : 'SOUND: OFF', 2, {});
+    button(R.close, 'CLOSE', 2, {});
+  }
+
+  function drawHUD(now) {
+    if (!playing) return;
+    if (!isTouch && !chatOpen && now - joinedAt < 25000) {
+      drawText('A/D MOVE  W JUMP  E GRAB/THROW  Q DROP  Y CHAT  M MENU', VW / 2, VH - 44, 2, '#444', 'center', '#e6e6e6');
+      drawText('GRAB WORKS ON BOXES AND ON PEOPLE', VW / 2, VH - 24, 2, '#444', 'center', '#e6e6e6');
+    }
+    if (!(chatOpen && isTouch)) drawMinimap();
+    if (me.carriedBy) drawText('PRESS JUMP TO WRIGGLE FREE', VW / 2, 90, 3, '#222', 'center', '#e6e6e6');
+
+    if (!chatOpen) {
+      button(menuBtnRect(), 'MENU', 2, { dark: true });
+      if (isTouch) button(chatBtnRect(), 'CHAT', 2, { dark: true });
+    }
+    drawLog(now);
+    if (chatOpen) drawChatBox();
+
+    if (isTouch && !uiBlocked()) {
+      const down = new Set(ptrs.values());
+      for (const z of touchZones()) {
+        const small = z.k === 'drop';
+        button(z, z.label, z.label.length === 1 ? 5 : small ? 2 : 3, { dark: true, down: down.has(z.k) });
+      }
+    }
+    if (menuOpen) drawMenu();
+  }
+
+  function render(now) {
+    ctx.setTransform(K, 0, 0, K, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = BG;
+    ctx.fillRect(0, 0, VW, VH);
+    if (!assetsReady) return;
+    if (scene === 'game' && playing) drawWorld();
+    drawFilm(now);
+    if (scene === 'title') drawTitle(); else drawHUD(now);
+  }
+
+  let last = performance.now(), acc = 0, lastSend = 0, filmReady = false;
   function frame(now) {
     requestAnimationFrame(frame);
-    if (!playing) return;
-    const dt = Math.min(0.1, (now - last) / 1000);
+    const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
-    acc += dt;
-    while (acc >= 1 / 60) { stepMe(1 / 60); acc -= 1 / 60; }
-
-    if (now - lastSend > 50) {
-      lastSend = now;
-      send({ t: "p", x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10,
-             vx: Math.round(me.vx), f: me.f, g: me.g ? 1 : 0, ra: reachT > 0 ? 1 : 0 });
+    if (!filmReady && assetsReady) { initFilm(); filmReady = true; }
+    if (!filmReady) return;
+    if (scene === 'game' && playing) {
+      acc += dt;
+      if (pendingSync) acc = 0;
+      while (acc >= 1 / 60) { stepMe(1 / 60); acc -= 1 / 60; }
+      if (!pendingSync && now - lastSend > 50) {
+        lastSend = now;
+        send({ t: 'p', x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10, vx: Math.round(me.vx), vy: Math.round(me.vy),
+          f: me.f, g: me.g ? 1 : 0, ra: reachT > 0 ? 1 : 0 });
+      }
+      updateWorld(dt);
+      updateSounds();
     }
-    if (isTouch) {
-      const label = me.carriedBy ? "WRIGGLE" : (me.hold || me.carry ? "THROW" : "GRAB");
-      if (label !== lastLabel) { actBtn.textContent = label; lastLabel = label; }
-    }
-    render(now, dt);
+    render(now);
   }
   resize();
   requestAnimationFrame(frame);
